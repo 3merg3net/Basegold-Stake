@@ -1,3 +1,4 @@
+// SERVER COMPONENT — no props/typing so it can’t conflict with any PageProps constraint
 export const metadata = {
   title: 'Stake – Base Gold',
   description: 'Stake BGLD into the Base Gold vault and start compounding.',
@@ -5,7 +6,6 @@ export const metadata = {
 
 import StakeClient from './StakeClient';
 
-export default function StakePage({ searchParams }: { searchParams: { lock?: string } }) {
-  const initialLock = Number(searchParams?.lock || '0');
-  return <StakeClient initialLockDays={initialLock} />;
+export default function StakePage() {
+  return <StakeClient />; // client reads ?lock= via useSearchParams
 }

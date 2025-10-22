@@ -1,8 +1,19 @@
 'use client';
 
+import { useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import StakeForm from '@/components/StakeForm';
 
-export default function StakeClient({ initialLockDays = 14 }: { initialLockDays?: number }) {
+export default function StakeClient() {
+  const sp = useSearchParams();
+  const initialLockDays = useMemo(() => {
+    const raw = sp.get('lock');
+    const n = raw ? Number(raw) : 14;
+    // clamp 1..30 and round
+    const clamped = Math.max(1, Math.min(30, Math.round(Number.isFinite(n) ? n : 14)));
+    return clamped;
+  }, [sp]);
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-black via-darkbg to-black text-white">
       <section className="max-w-6xl mx-auto px-4 pt-12 pb-6 text-center">
