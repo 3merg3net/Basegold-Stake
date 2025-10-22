@@ -1,0 +1,89 @@
+{
+  "abi": [
+    {
+      "type": "function",
+      "name": "stake",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        {
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "name": "days",
+          "type": "uint8"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "addStake",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        {
+          "name": "positionId",
+          "type": "uint256"
+        },
+        {
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "compoundAll",
+      "stateMutability": "nonpayable",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "claimEth",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        {
+          "name": "positionId",
+          "type": "uint256"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "withdraw",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        {
+          "name": "positionId",
+          "type": "uint256"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "event",
+      "name": "Compounded",
+      "inputs": [
+        {
+          "name": "user",
+          "type": "address",
+          "indexed": true
+        },
+        {
+          "name": "ethIn",
+          "type": "uint256",
+          "indexed": false
+        },
+        {
+          "name": "bgldOut",
+          "type": "uint256",
+          "indexed": false
+        }
+      ],
+      "anonymous": false
+    }
+  ]
+}
