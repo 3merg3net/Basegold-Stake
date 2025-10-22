@@ -1,50 +1,52 @@
-// ==== Addresses / Token Settings (replace when wiring) ====
-export const BGLD_TOKEN = '0xYourBGLDTokenAddress';    // TODO: replace
-export const VAULT_ADDRESS = '0xYourVaultAddress';      // TODO: replace
-export const BGLD_DECIMALS = 18;
+// src/lib/constants.ts
+
 export const BGLD_SYMBOL = 'BGLD';
+export const BGLD_DECIMALS = 18;
 
-// ==== Lock Options (Quick Picks) ====
-export const LOCK_OPTIONS = [
-  { days: 7 },
-  { days: 14 },
-  { days: 30 },
-];
-
-// ==== APR Model ====
-// Requirements: 10% at 1d -> 1200% at 30d.
-// We'll use a smooth exponential curve (feels premium vs. simple linear).
-// Curve passes exactly through (1d, 10%) and (30d, 1200%).
-// APR(d) = a * b^(d - 1), where:
-// a = 10; b = (1200 / 10)^(1 / (30 - 1)) = (120)^(1/29)
-const APR_BASE = 10; // %
-const APR_GROWTH = Math.pow(120, 1 / 29); // ≈ 1.222...
-
+// --- APR curve: 10% at 1 day → 1200% at 30 days ---
 export function aprForDays(days: number): number {
   const d = Math.max(1, Math.min(30, Math.round(days)));
-  const apr = APR_BASE * Math.pow(APR_GROWTH, d - 1);
-  return Math.round(apr); // whole % looks better in UI
+  const t = (d - 1) / 29; // 0..1
+  const base = 10 * Math.pow(1 + 0.08, d - 1); // ~10 → ~116
+  const booster = 1 + 11.0 * Math.pow(t, 2.2); // boosts to ~1200
+  const apr = base * booster;
+  return Math.min(1200, Math.round(apr));
 }
 
-// ==== Early Exit Policy ====
-// 1) Rewards vest linearly across the lock. Exiting early forfeits ALL unvested rewards.
-// 2) Emergency Exit: additional penalty on principal to discourage gaming.
-//    Penalty scales with how early you exit: from 90% when exiting immediately,
-//    down to 10% when you’re at the very end.
-//    penalty% = 10% + 80% * (remaining / total)
-export function emergencyExitPenaltyPercent(totalDays: number, elapsedDays: number): number {
-  const t = Math.max(1, Math.min(30, Math.round(totalDays)));
-  const e = Math.max(0, Math.min(t, Math.round(elapsedDays)));
-  const remaining = t - e;
-  const ratio = remaining / t; // 1 at start, 0 near end
-  const penalty = 10 + 80 * ratio; // 10%..90%
-  return Math.round(penalty); // %
+/**
+ * Emergency exit principal penalty (% of principal).
+ * Max 5% at day 0, decays smoothly to 0% at maturity.
+ * Rewards: unvested portion is forfeited separately (handled/displayed in UI/logic).
+ */
+export function emergencyExitPenaltyPercent(lockDays: number, elapsedDays: number): number {
+  const L = Math.max(1, Math.min(30, Math.round(lockDays)));
+  const e = Math.max(0, Math.min(L, Math.round(elapsedDays)));
+  const progress = e / L; // 0..1
+  // Smooth decay: 5% -> 0%
+  const pct = 5 * (1 - Math.pow(progress, 0.9));
+  return Math.max(0, Math.min(5, Math.round(pct * 10) / 10)); // one decimal
 }
 
-// Helper: plain number abbreviations
-export function abbr(n: number): string {
-  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + 'B';
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + 'M';
-  if (n >= 1_000) return (n / 1_000).toFixed(2) + 'K';
-  return n.toString();
+/** Vested rewards % (linearly with time) */
+export function vestedRewardsPercent(lockDays: number, elapsedDays: number): number {
+  const L = Math.max(1, Math.min(30, Math.round(lockDays)));
+  const e = Math.max(0, Math.min(L, Math.round(elapsedDays)));
+  const progress = (e / L) * 100;
+  return Math.max(0, Math.min(100, Math.round(progress)));
 }
+
+/** Unvested rewards % (forfeited on early exit) */
+export function unvestedRewardsPercent(lockDays: number, elapsedDays: number): number {
+  return Math.max(0, Math.min(100, 100 - vestedRewardsPercent(lockDays, elapsedDays)));
+}
+
+// (optional) simple number formatters
+export const formatPct = (v: number) =>
+  `${(Number.isFinite(v) ? v : 0).toFixed(v % 1 === 0 ? 0 : 1)}%`;
+
+export const formatUSD = (v: number) => {
+  if (!Number.isFinite(v)) return '$0.00';
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
+  if (v >= 1_000) return `$${(v / 1_000).toFixed(2)}k`;
+  return `$${v.toFixed(2)}`;
+};

@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAccount /*, useReadContract, useWriteContract*/ } from 'wagmi';
 import { parseUnits /*, formatUnits*/ } from 'viem';
 import {
-  LOCK_OPTIONS,
   BGLD_DECIMALS,
   BGLD_SYMBOL,
   aprForDays,
   emergencyExitPenaltyPercent,
+  vestedRewardsPercent,
+  unvestedRewardsPercent,
+  formatPct,
 } from '@/lib/constants';
 // import { BGLD_TOKEN, VAULT_ADDRESS } from '@/lib/constants';
 // import ERC20 from '@/lib/abis/ERC20.json';
@@ -28,11 +30,10 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Emergency exit estimator
+  // Emergency exit estimator (visual only)
   const [exitElapsed, setExitElapsed] = useState<number>(0);
 
   useEffect(() => {
-    // if query changes while mounted (navigating), update selected lock
     setLockDays(clampLock(initialLockDays));
   }, [initialLockDays]);
 
@@ -51,8 +52,8 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
         setApproved(true);
       } else {
         // const value = parseUnits(amount, BGLD_DECIMALS);
-        // const hash = await writeContractAsync({ ...approve call... });
-        // setTxHash(hash as string);
+        // const tx = await writeContractAsync({ ...approve call... });
+        // setTxHash(tx as string);
       }
     } catch (e: any) {
       setError(e?.shortMessage || e?.message || 'Approve failed');
@@ -70,8 +71,8 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
         setBgldBalance(newBal);
       } else {
         // const value = parseUnits(amount, BGLD_DECIMALS);
-        // const hash = await writeContractAsync({ ...stake call... });
-        // setTxHash(hash as string);
+        // const tx = await writeContractAsync({ ...stake call... });
+        // setTxHash(tx as string);
       }
       setAmount('');
       setApproved(false);
@@ -83,13 +84,18 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
   };
 
   const estUsd = formatDemoUSD(amountNum);
-  const vestingNote = `Rewards vest linearly across ${lockDays} days. Exiting early forfeits unvested rewards.`;
-  const penaltyPct = emergencyExitPenaltyPercent(lockDays, exitElapsed);
+
+  // Emergency exit preview numbers (UI only)
+  const principalPenalty = emergencyExitPenaltyPercent(lockDays, exitElapsed); // now max 5%
+  const vestedPct = vestedRewardsPercent(lockDays, exitElapsed);
+  const unvestedPct = unvestedRewardsPercent(lockDays, exitElapsed);
 
   return (
     <div className="relative rounded-2xl border border-gold/30 bg-black/40 backdrop-blur-md p-6 overflow-hidden">
-      <div className="absolute -inset-1 opacity-20 blur-2xl"
-           style={{ background: 'radial-gradient(500px 150px at 50% -10%, rgba(212,175,55,.25), transparent)' }} />
+      <div
+        className="absolute -inset-1 opacity-20 blur-2xl"
+        style={{ background: 'radial-gradient(500px 150px at 50% -10%, rgba(212,175,55,.25), transparent)' }}
+      />
       <div className="relative space-y-6">
         {/* Balance */}
         <div className="flex items-center justify-between">
@@ -124,10 +130,9 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
         <div className="space-y-3">
           <label className="block text-sm text-white/80">Lock Duration</label>
 
-          {/* Quick picks: 1,7,14,21,30 */}
-          <div className="grid grid-cols-5 gap-2">
+          {/* Quick picks: 1,7,10,14,21,30 */}
+          <div className="grid grid-cols-6 gap-2">
             {[1,7,10,14,21,30].map((d) => (
-
               <button
                 key={d}
                 onClick={() => setLockDays(d)}
@@ -203,21 +208,20 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
         {error && <div className="text-sm text-red-400">{error}</div>}
 
         {/* Policy Copy */}
-        <div className="rounded-xl border border-white/10 bg-black/30 p-4 text-sm leading-relaxed">
+        <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-sm leading-relaxed">
           <div className="font-semibold text-gold mb-1">Reward Vesting & Early Exit</div>
           <ul className="list-disc ml-5 space-y-1 text-white/80">
             <li>{`Rewards vest linearly across ${lockDays} days. Exiting early forfeits unvested rewards.`}</li>
             <li>
-              <span className="font-semibold">Emergency Exit</span>: You may exit before maturity, but a penalty
-              applies to principal and <em>all unvested rewards are forfeited</em>.
-            </li>
-            <li>
-              Penalty scales with how early you exit: from <strong>high</strong> at day 0 down to <strong>low</strong> near maturity.
+              <span className="font-semibold">Emergency Exit</span>: Available anytime, but a small principal penalty applies
+              that <em>starts at 5%</em> on day 0 and decays to <em>0%</em> at maturity.
             </li>
           </ul>
 
-          {/* Emergency Exit Estimator */}
+          {/* Emergency Exit Estimator — calm, optional */}
           <div className="mt-4">
+            <div className="text-sm font-semibold text-gold mb-2">Emergency Exit Preview</div>
+
             <div className="flex items-center justify-between text-xs text-white/60 mb-1">
               <span>Exit at day 0</span>
               <span>
@@ -233,12 +237,24 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
               onChange={(e) => setExitElapsed(Number(e.target.value))}
               className="w-full accent-[var(--gold)]"
             />
-            <div className="text-xs mt-2">
-              Estimated Emergency Exit Penalty:&nbsp;
-              <span className="text-gold font-semibold">
-                {emergencyExitPenaltyPercent(lockDays, exitElapsed)}%
-              </span>{' '}
-              of principal • Unvested rewards: <span className="text-red-400 font-semibold">forfeited</span>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+              <div className="rounded-lg border border-white/10 bg-black/40 p-3 text-center">
+                <div className="text-[11px] uppercase tracking-wider text-white/60">Principal Penalty</div>
+                <div className="text-lg font-semibold text-gold">{formatPct(principalPenalty)}</div>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-black/40 p-3 text-center">
+                <div className="text-[11px] uppercase tracking-wider text-white/60">Vested Rewards</div>
+                <div className="text-lg font-semibold text-gold">{formatPct(vestedPct)}</div>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-black/40 p-3 text-center">
+                <div className="text-[11px] uppercase tracking-wider text-white/60">Unvested Forfeited</div>
+                <div className="text-lg font-semibold text-gold">{formatPct(unvestedPct)}</div>
+              </div>
+            </div>
+
+            <div className="text-xs text-white/60 mt-2">
+              Preview only. Exact amounts calculate on-chain at exit time.
             </div>
           </div>
         </div>
