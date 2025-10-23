@@ -27,10 +27,17 @@ export default function Header() {
       />
 
       <div className="relative mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        {/* Logo -> home */}
+        {/* Logo -> home (BIGGER) */}
         <Link href="/" className="flex items-center gap-3">
-          <span className="relative block h-9 w-9">
-            <Image src="/logo.png" alt="Base Gold" fill className="object-contain" priority />
+          {/* Increased from h-9 w-9 -> h-12 w-12 on mobile, even larger on md+ */}
+          <span className="relative block h-12 w-12 md:h-14 md:w-14">
+            <Image
+              src="/logo.png"
+              alt="Base Gold"
+              fill
+              className="object-contain"
+              priority
+            />
           </span>
           <span className="hidden sm:inline font-semibold tracking-wide">
             <span className="text-[#0AA0FF]">BASE</span>{' '}
@@ -38,11 +45,12 @@ export default function Header() {
           </span>
         </Link>
 
-        {/* Desktop nav */}
+        {/* Desktop nav — added Status */}
         <nav className="hidden md:flex items-center gap-6 text-sm text-white/90">
           <NavLink href="/">Home</NavLink>
           <NavLink href="/stake">Stake</NavLink>
           <NavLink href="/claim">Claim Dashboard</NavLink>
+          <NavLink href="/status">Status</NavLink>
           <NavLink href="/how-to">How-to</NavLink>
           <NavLink href="/how-it-works">How It Works</NavLink>
           <NavLink href="/terms">Terms</NavLink>
@@ -65,7 +73,7 @@ export default function Header() {
         </button>
       </div>
 
-      {/* Mobile drawer */}
+      {/* Mobile drawer — added Status + bigger icon */}
       <div
         className={`md:hidden fixed inset-y-0 right-0 z-50 w-72 transform bg-[#0B0F14]/98 backdrop-blur-md border-l border-white/10 transition-transform duration-300 ${
           open ? 'translate-x-0' : 'translate-x-full'
@@ -74,7 +82,7 @@ export default function Header() {
       >
         <div className="flex items-center justify-between px-4 py-3 text-white border-b border-white/10">
           <div className="flex items-center gap-3">
-            <span className="relative block h-7 w-7">
+            <span className="relative block h-10 w-10">
               <Image src="/logo.png" alt="BGLD" fill className="object-contain" />
             </span>
             <span className="font-semibold text-amber-300">BASE GOLD</span>
@@ -95,6 +103,7 @@ export default function Header() {
             ['/', 'Home'],
             ['/stake', 'Stake'],
             ['/claim', 'Claim Dashboard'],
+            ['/status', 'Status'],
             ['/how-to', 'How-to'],
             ['/how-it-works', 'How It Works'],
             ['/terms', 'Terms'],
@@ -116,12 +125,7 @@ export default function Header() {
       </div>
 
       {/* Backdrop for drawer */}
-      {open && (
-        <div
-          className="fixed inset-0 z-40 bg-black/40 md:hidden"
-          onClick={() => setOpen(false)}
-        />
-      )}
+      {open && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setOpen(false)} />}
     </header>
   );
 }
