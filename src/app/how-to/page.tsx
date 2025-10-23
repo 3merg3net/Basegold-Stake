@@ -112,7 +112,7 @@ export default function HowToPage() {
             />
             <Q
               q="What happens if I exit early?"
-              a="You can use Emergency Exit anytime. Unvested rewards are forfeited and a small principal penalty applies (5%→0%)."
+              a="You can use Emergency Exit anytime. A percentage of unvested rewards are forfeited and a small principal penalty applies, determined by how early you exit (5%→0%)."
             />
             <Q
               q="Where can I see system health?"
