@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -27,6 +26,21 @@ import STAKING_ABI from '@/lib/abis/BaseGoldStaking';
 
 const TOKEN   = (process.env.NEXT_PUBLIC_BGLD_ADDRESS    || '').toLowerCase() as `0x${string}`;
 const STAKING = (process.env.NEXT_PUBLIC_STAKING_ADDRESS || '').toLowerCase() as `0x${string}`;
+
+// Extend ERC20 ABI with a minimal "mint(address,uint256)" for MockBGLD on testnet
+const ERC20_WITH_MINT = [
+  ...(ERC20_ABI as any[]),
+  {
+    type: 'function',
+    name: 'mint',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'to',     type: 'address'  },
+      { name: 'amount', type: 'uint256'  },
+    ],
+    outputs: [],
+  },
+] as const;
 
 /** Identify stake() variant from ABI */
 function detectStakeVariant(abi: any) {
@@ -77,7 +91,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
   }, [amount]);
 
   // ---- On-chain reads ----
-  const { data: balance = 0n } = useReadContract({
+  const { data: balanceRaw } = useReadContract({
     abi: ERC20_ABI,
     address: TOKEN,
     functionName: 'balanceOf',
@@ -85,13 +99,16 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
     query: { enabled: isConnected && !!address && !!TOKEN },
   });
 
-  const { data: allowance = 0n, refetch: refetchAllowance } = useReadContract({
+  const { data: allowanceRaw, refetch: refetchAllowance } = useReadContract({
     abi: ERC20_ABI,
     address: TOKEN,
     functionName: 'allowance',
     args: address ? [address, STAKING] : undefined,
     query: { enabled: isConnected && !!address && !!STAKING && !!TOKEN },
   });
+
+  const balance   = (balanceRaw   ?? 0n) as bigint;
+  const allowance = (allowanceRaw ?? 0n) as bigint;
 
   const needsApprove = allowance < amountWei;
   const canApprove  = isConnected && !busy && amountWei > 0n && needsApprove;
@@ -102,7 +119,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
   // Detect stake signature (show in Debug + route args properly)
   const stakeVariant = useMemo(() => detectStakeVariant(STAKING_ABI), []);
 
-  // ---- Approve → Stake flow ----
+  // ---- Approve ----
   const onApprove = async () => {
     try {
       setError(null); setTxHash(null); setBusy(true);
@@ -128,6 +145,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
     }
   };
 
+  // ---- Stake ----
   const onStake = async () => {
     try {
       setError(null); setTxHash(null); setBusy(true);
@@ -159,7 +177,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
           address: STAKING,
           functionName: 'stake',
           args,
-          account: address,
+          account: address!,
         });
       } catch (e: any) {
         console.error('simulateContract(stake) reverted:', e);
@@ -190,6 +208,31 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
     } catch (e: any) {
       console.error('Stake failed:', e);
       setError(e?.message || e?.shortMessage || 'Stake failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ---- Mint MockBGLD (Base Sepolia only) ----
+  const onMintMock = async () => {
+    try {
+      setBusy(true);
+      setError(null);
+      if (!address) throw new Error('Connect wallet first');
+      const amountToMint = parseUnits('1000000', BGLD_DECIMALS); // 1,000,000 BGLD
+      const hash = await writeContractAsync({
+        abi: ERC20_WITH_MINT as any,
+        address: TOKEN,
+        functionName: 'mint',
+        args: [address, amountToMint],
+      });
+      setTxHash(hash);
+      await publicClient!.waitForTransactionReceipt({ hash });
+      await refetchAllowance?.();
+      alert('✅ Minted 1,000,000 MockBGLD to your wallet!');
+    } catch (e: any) {
+      console.error(e);
+      setError(e?.message || e?.shortMessage || 'Mint failed');
     } finally {
       setBusy(false);
     }
@@ -283,6 +326,17 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
             <span className="text-white/60"> &nbsp;(10% at 1d → 1200% at 30d)</span>
           </div>
         </div>
+
+        {/* Mint MockBGLD (testnet only) */}
+        {chainId === 84532 && (
+          <button
+            onClick={onMintMock}
+            disabled={busy}
+            className="rounded-xl w-full px-4 py-3 font-semibold bg-emerald-500/90 hover:bg-emerald-400 text-black"
+          >
+            {busy ? 'Minting…' : '💰 Mint 1M MockBGLD (Testnet)'}
+          </button>
+        )}
 
         {/* Approve / Stake */}
         <div className="grid grid-cols-2 gap-4">
@@ -386,12 +440,10 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
           <div>STAKING_ABI ok: {String(!!(STAKING_ABI as any)?.length)}</div>
           <div>
             stake inputs seen: [
-            {
-              (STAKING_ABI as any[])
-                .find((f: any) => f?.type === 'function' && f?.name === 'stake')
-                ?.inputs?.map((i: any) => i?.type)
-                ?.join('","')
-            }]
+            {(STAKING_ABI as any[]).find((f: any) => f?.type === 'function' && f?.name === 'stake')
+              ?.inputs?.map((i: any) => i?.type)
+              ?.join('","')}
+            ]
           </div>
           <div>inferred signature: {
             stakeVariant.ok
