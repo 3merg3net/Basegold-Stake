@@ -6,9 +6,9 @@ import {
   useChainId,
   useReadContract,
   useWriteContract,
+  usePublicClient,
 } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
-import { usePublicClient } from 'wagmi';
 
 import {
   BGLD_DECIMALS,
@@ -20,35 +20,18 @@ import {
   formatPct,
 } from '@/lib/constants';
 
-// IMPORTANT: these must point at your TS exports (not JSON names)
+// TS exports (not JSON)
 import ERC20_ABI from '@/lib/abis/ERC20';
 import STAKING_ABI from '@/lib/abis/BaseGoldStaking';
 
 const TOKEN   = (process.env.NEXT_PUBLIC_BGLD_ADDRESS    || '').toLowerCase() as `0x${string}`;
 const STAKING = (process.env.NEXT_PUBLIC_STAKING_ADDRESS || '').toLowerCase() as `0x${string}`;
 
-// Extend ERC20 ABI with a minimal "mint(address,uint256)" for MockBGLD on testnet
-const ERC20_WITH_MINT = [
-  ...((ERC20_ABI as unknown) as any[]),
-  {
-    type: 'function',
-    name: 'mint',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'to', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [],
-  },
-] as const;
-
 /** Identify stake() variant from ABI */
-function detectStakeVariant(abi: any) {
+function detectStakeVariant(abi: readonly any[]) {
   try {
-    const stake = (abi as any[]).find(
-      (f) => f?.type === 'function' && f?.name === 'stake'
-    );
-    const types = stake?.inputs?.map((i: any) => i?.type) || [];
+    const stake = abi.find((f) => f?.type === 'function' && f?.name === 'stake');
+    const types: string[] = stake?.inputs?.map((i: any) => i?.type) ?? [];
     const sig = types.join(',');
 
     if (sig === 'uint256,uint32,bool') return { ok: true, kind: 'v3_uint32_bool' as const, types, sig };
@@ -91,24 +74,25 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
   }, [amount]);
 
   // ---- On-chain reads ----
-  const { data: balanceRaw } = useReadContract({
+  const { data: balanceData } = useReadContract({
     abi: ERC20_ABI,
     address: TOKEN,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: { enabled: isConnected && !!address && !!TOKEN },
-  });
+  }) as unknown as { data?: bigint };
 
-  const { data: allowanceRaw, refetch: refetchAllowance } = useReadContract({
+  const balance = balanceData ?? 0n;
+
+  const { data: allowanceData, refetch: refetchAllowance } = useReadContract({
     abi: ERC20_ABI,
     address: TOKEN,
     functionName: 'allowance',
     args: address ? [address, STAKING] : undefined,
     query: { enabled: isConnected && !!address && !!STAKING && !!TOKEN },
-  });
+  }) as unknown as { data?: bigint; refetch: () => Promise<any> };
 
-  const balance   = (balanceRaw   ?? 0n) as bigint;
-  const allowance = (allowanceRaw ?? 0n) as bigint;
+  const allowance = allowanceData ?? 0n;
 
   const needsApprove = allowance < amountWei;
   const canApprove  = isConnected && !busy && amountWei > 0n && needsApprove;
@@ -117,9 +101,9 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
   const onMax = () => setAmount(formatUnits(balance, BGLD_DECIMALS));
 
   // Detect stake signature (show in Debug + route args properly)
-  const stakeVariant = useMemo(() => detectStakeVariant(STAKING_ABI), []);
+  const stakeVariant = useMemo(() => detectStakeVariant(STAKING_ABI as readonly any[]), []);
 
-  // ---- Approve ----
+  // ---- Approve → Stake flow ----
   const onApprove = async () => {
     try {
       setError(null); setTxHash(null); setBusy(true);
@@ -145,7 +129,6 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
     }
   };
 
-  // ---- Stake ----
   const onStake = async () => {
     try {
       setError(null); setTxHash(null); setBusy(true);
@@ -163,10 +146,11 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
       } else if (stakeVariant.ok && stakeVariant.kind === 'v2_uint256') {
         args = [amountWei, BigInt(lockDays)];
       } else {
+        const stakeDef = (STAKING_ABI as readonly any[]).find(
+          (f) => f?.type === 'function' && f?.name === 'stake'
+        );
         throw new Error(
-          `Unsupported stake() inputs in ABI: ${JSON.stringify(
-            (STAKING_ABI as any[]).find((f: any) => f?.name === 'stake')?.inputs || []
-          )}`
+          `Unsupported stake() inputs in ABI: ${JSON.stringify(stakeDef?.inputs ?? [])}`
         );
       }
 
@@ -177,7 +161,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
           address: STAKING,
           functionName: 'stake',
           args,
-          account: address!,
+          account: address,
         });
       } catch (e: any) {
         console.error('simulateContract(stake) reverted:', e);
@@ -213,37 +197,20 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
     }
   };
 
-  // ---- Mint MockBGLD (Base Sepolia only) ----
-  const onMintMock = async () => {
-    try {
-      setBusy(true);
-      setError(null);
-      if (!address) throw new Error('Connect wallet first');
-      const amountToMint = parseUnits('1000000', BGLD_DECIMALS); // 1,000,000 BGLD
-      const hash = await writeContractAsync({
-        abi: ERC20_WITH_MINT as any,
-        address: TOKEN,
-        functionName: 'mint',
-        args: [address, amountToMint],
-      });
-      setTxHash(hash);
-      await publicClient!.waitForTransactionReceipt({ hash });
-      await refetchAllowance?.();
-      alert('✅ Minted 1,000,000 MockBGLD to your wallet!');
-    } catch (e: any) {
-      console.error(e);
-      setError(e?.message || e?.shortMessage || 'Mint failed');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const estUsd = formatDemoUSD(amountNum);
 
   // Emergency exit preview numbers (UI only)
   const principalPenalty = emergencyExitPenaltyPercent(lockDays, exitElapsed);
   const vestedPct = vestedRewardsPercent(lockDays, exitElapsed);
   const unvestedPct = unvestedRewardsPercent(lockDays, exitElapsed);
+
+  // for Debug panel: read the stake inputs without casting to mutable array
+  const stakeInputsList = useMemo(() => {
+    const def = (STAKING_ABI as readonly any[]).find(
+      (f) => f?.type === 'function' && f?.name === 'stake'
+    );
+    return (def?.inputs ?? []).map((i: any) => i?.type);
+  }, []);
 
   return (
     <div className="relative rounded-2xl border border-gold/30 bg-black/40 backdrop-blur-md p-6 overflow-hidden">
@@ -326,17 +293,6 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
             <span className="text-white/60"> &nbsp;(10% at 1d → 1200% at 30d)</span>
           </div>
         </div>
-
-        {/* Mint MockBGLD (testnet only) */}
-        {chainId === 84532 && (
-          <button
-            onClick={onMintMock}
-            disabled={busy}
-            className="rounded-xl w-full px-4 py-3 font-semibold bg-emerald-500/90 hover:bg-emerald-400 text-black"
-          >
-            {busy ? 'Minting…' : '💰 Mint 1M MockBGLD (Testnet)'}
-          </button>
-        )}
 
         {/* Approve / Stake */}
         <div className="grid grid-cols-2 gap-4">
@@ -438,13 +394,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
           <div>needsApprove: {String(needsApprove)}</div>
           <div>ERC20_ABI ok: {String(!!(ERC20_ABI as any)?.length)}</div>
           <div>STAKING_ABI ok: {String(!!(STAKING_ABI as any)?.length)}</div>
-          <div>
-            stake inputs seen: [
-            {(STAKING_ABI as any[]).find((f: any) => f?.type === 'function' && f?.name === 'stake')
-              ?.inputs?.map((i: any) => i?.type)
-              ?.join('","')}
-            ]
-          </div>
+          <div>stake inputs seen: [{stakeInputsList.join('","')}]</div>
           <div>inferred signature: {
             stakeVariant.ok
               ? (stakeVariant.kind === 'v3_uint32_bool'   ? 'stake(uint256,uint32,bool)'
