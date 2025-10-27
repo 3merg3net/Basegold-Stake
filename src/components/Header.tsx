@@ -21,8 +21,7 @@ export default function Header() {
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 -top-[1px] h-[1px]"
         style={{
-          background:
-            'linear-gradient(90deg, transparent, rgba(212,175,55,0.7), transparent)',
+          background: 'linear-gradient(90deg, transparent, rgba(212,175,55,0.7), transparent)',
         }}
       />
 
@@ -45,10 +44,11 @@ export default function Header() {
           </span>
         </Link>
 
-        {/* Desktop nav — added Status */}
+        {/* Desktop nav — includes Status, How-to, How It Works, and Positions */}
         <nav className="hidden md:flex items-center gap-6 text-sm text-white/90">
           <NavLink href="/">Home</NavLink>
-          <NavLink href="/stake">Stake</NavLink>
+          <NavLink href="/stake">Stake Claim</NavLink>
+          <NavLink href="/positions">Vaults</NavLink>
           <NavLink href="/claim">Claim Dashboard</NavLink>
           <NavLink href="/status">Status</NavLink>
           <NavLink href="/how-to">How-to</NavLink>
@@ -73,7 +73,7 @@ export default function Header() {
         </button>
       </div>
 
-      {/* Mobile drawer — added Status + bigger icon */}
+      {/* Mobile drawer — includes Status, How-to, How It Works, and Positions */}
       <div
         className={`md:hidden fixed inset-y-0 right-0 z-50 w-72 transform bg-[#0B0F14]/98 backdrop-blur-md border-l border-white/10 transition-transform duration-300 ${
           open ? 'translate-x-0' : 'translate-x-full'
@@ -83,7 +83,8 @@ export default function Header() {
         <div className="flex items-center justify-between px-4 py-3 text-white border-b border-white/10">
           <div className="flex items-center gap-3">
             <span className="relative block h-10 w-10">
-              <Image src="/logo.png" alt="BGLD" fill className="object-contain" />
+              <Image src="/logo.png" alt="BGLD" fill sizes="40px" className="object-contain" />
+
             </span>
             <span className="font-semibold text-amber-300">BASE GOLD</span>
           </div>
@@ -102,6 +103,7 @@ export default function Header() {
           {[
             ['/', 'Home'],
             ['/stake', 'Stake'],
+            ['/positions', 'Positions'],
             ['/claim', 'Claim Dashboard'],
             ['/status', 'Status'],
             ['/how-to', 'How-to'],

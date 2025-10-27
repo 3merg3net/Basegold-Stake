@@ -1,89 +1,91 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useAccount, useReadContract, useWriteContract, useEstimateGas, useSwitchChain } from 'wagmi';
-import { base, baseSepolia } from 'viem/chains';
-import { ABI, ADDR, CHAIN_ID } from '@/lib/contracts';
-import { parseUnits } from 'viem';
+import { useEffect, useMemo, useState } from 'react';
+import { erc20Abi, formatUnits, parseUnits } from 'viem';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { BGLD_ADDRESS, STAKING_ADDRESS, stakingAbi } from '@/lib/contracts';
 
 export function useStaking() {
-  const chain = CHAIN_ID === base.id ? base : baseSepolia;
-  const { address, chainId } = useAccount();
-  const { switchChainAsync } = useSwitchChain();
-  const { writeContractAsync } = useWriteContract();
+  const { address, chainId, isConnected } = useAccount();
+  const [amount, setAmount] = useState<string>('100'); // default input
+  const [days, setDays]     = useState<number>(10);
+  const [auto, setAuto]     = useState<boolean>(false);
 
-  async function ensureChain() {
-    if (!chainId || chainId !== chain.id) {
-      await switchChainAsync({ chainId: chain.id });
-    }
-  }
+  // allowance & balance
+  const { data: allowance } = useReadContract({
+    address: BGLD_ADDRESS,
+    abi: erc20Abi,
+    functionName: 'allowance',
+    args: [address ?? '0x0000000000000000000000000000000000000000', STAKING_ADDRESS],
+    query: { enabled: !!address },
+  });
 
-  async function stake(amountStr: string, daysLocked: number, autoCompound: boolean) {
-    await ensureChain();
-    // Approve if needed is typically done in UI; this is just the stake call:
-    const amount = parseUnits(amountStr || '0', 18);
-    return writeContractAsync({
-      address: ADDR.STAKING,
-      abi: ABI.STAKING,
-      functionName: 'stake',
-      args: [amount, BigInt(daysLocked), autoCompound],
-    });
-  }
+  const { data: balance } = useReadContract({
+    address: BGLD_ADDRESS,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: [address ?? '0x0000000000000000000000000000000000000000'],
+    query: { enabled: !!address },
+  });
 
-  function approveIfNeeded(amountStr: string) {
-    const amount = parseUnits(amountStr || '0', 18);
-    return writeContractAsync({
-      address: ADDR.BGLD,
-      abi: ABI.ERC20,
+  // positions
+  const { data: ids, refetch: refetchIds } = useReadContract({
+    address: STAKING_ADDRESS,
+    abi: stakingAbi,
+    functionName: 'positionsOf',
+    args: [address ?? '0x0000000000000000000000000000000000000000'],
+    query: { enabled: !!address },
+  });
+
+  const parsedAmount = useMemo(() => {
+    try { return parseUnits(amount || '0', 18); } catch { return 0n; }
+  }, [amount]);
+
+  const needApproval = useMemo(() => {
+    if (parsedAmount === 0n) return false;
+    if (!allowance) return true;
+    return (allowance as bigint) < parsedAmount;
+  }, [allowance, parsedAmount]);
+
+  // writes
+  const { writeContract, data: txHash, isPending } = useWriteContract();
+  const { isLoading: isMining, isSuccess: isMined } = useWaitForTransactionReceipt({ hash: txHash });
+
+  useEffect(() => {
+    if (isMined) refetchIds();
+  }, [isMined, refetchIds]);
+
+  const approve = () => {
+    if (!parsedAmount) return;
+    writeContract({
+      address: BGLD_ADDRESS,
+      abi: erc20Abi,
       functionName: 'approve',
-      args: [ADDR.STAKING, amount],
+      args: [STAKING_ADDRESS, parsedAmount],
     });
-  }
+  };
 
-  function claim(id: bigint) {
-    return writeContractAsync({
-      address: ADDR.STAKING,
-      abi: ABI.STAKING,
-      functionName: 'claim',
-      args: [id],
+  const stake = () => {
+    if (!parsedAmount) return;
+    writeContract({
+      address: STAKING_ADDRESS,
+      abi: stakingAbi,
+      functionName: 'stake',
+      args: [parsedAmount, BigInt(days), auto],
     });
-  }
-
-  function compound(id: bigint) {
-    return writeContractAsync({
-      address: ADDR.STAKING,
-      abi: ABI.STAKING,
-      functionName: 'compound',
-      args: [id],
-    });
-  }
-
-  function withdraw(id: bigint) {
-    return writeContractAsync({
-      address: ADDR.STAKING,
-      abi: ABI.STAKING,
-      functionName: 'withdraw',
-      args: [id],
-    });
-  }
-
-  function emergencyExit(id: bigint) {
-    return writeContractAsync({
-      address: ADDR.STAKING,
-      abi: ABI.STAKING,
-      functionName: 'emergencyExit',
-      args: [id],
-    });
-  }
+  };
 
   return {
-    chain,
-    address,
-    stake,
-    approveIfNeeded,
-    claim,
-    compound,
-    withdraw,
-    emergencyExit,
+    isConnected, chainId, address,
+    amount, setAmount,
+    days, setDays,
+    auto, setAuto,
+    balance: balance as bigint | undefined,
+    allowance: allowance as bigint | undefined,
+    ids: (ids as bigint[] | undefined) ?? [],
+    needApproval,
+    approve, stake,
+    isPending: isPending || isMining,
+    txHash,
   };
 }
