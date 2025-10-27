@@ -233,8 +233,9 @@ export default function PositionsPanel() {
     if (setBusy && typeof id === 'bigint') setBusyId(id);
     try {
       // pre-simulate for clear reverts
-      await publicClient!.simulateContract({ ...req, account: address! });
-      const hash = await writeContractAsync({ ...req, account: address! });
+      const cleanReq = { ...req, account: address!, chain: undefined } as const;
+      await publicClient!.simulateContract(cleanReq);
+      const hash = await writeContractAsync(cleanReq);
       setStatus(`${label.replace(/…$/, '')} submitted: ${hash.slice(0, 10)}…`);
       await publicClient!.waitForTransactionReceipt({ hash });
       setStatus(null);
