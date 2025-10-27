@@ -318,6 +318,46 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
             {busy ? 'Staking…' : 'Stake'}
           </button>
         </div>
+        {/* Test Mint (Sepolia only) */}
+{chainId === 84532 && (
+  <button
+    onClick={async () => {
+      try {
+        setBusy(true);
+        setError(null);
+        const hash = await writeContractAsync({
+          abi: [
+            ...((ERC20_ABI as unknown) as any[]),
+            {
+              type: 'function',
+              name: 'mint',
+              stateMutability: 'nonpayable',
+              inputs: [
+                { name: 'to', type: 'address' },
+                { name: 'amount', type: 'uint256' },
+              ],
+              outputs: [],
+            },
+          ],
+          address: TOKEN,
+          functionName: 'mint',
+          args: [address, parseUnits('10000', BGLD_DECIMALS)], // 10k test tokens
+        });
+        setTxHash(hash);
+        await publicClient!.waitForTransactionReceipt({ hash });
+      } catch (e: any) {
+        console.error(e);
+        setError(e?.shortMessage || e?.message || 'Mint failed');
+      } finally {
+        setBusy(false);
+      }
+    }}
+    className={`rounded-xl px-4 py-3 font-semibold border border-gold/40 bg-black/40 hover:bg-black/60 text-gold w-full`}
+  >
+    🧪 Mint 10,000 MockBGLD
+  </button>
+)}
+
 
         {/* Status */}
         {txHash && (
