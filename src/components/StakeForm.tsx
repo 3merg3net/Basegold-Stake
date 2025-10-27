@@ -29,14 +29,14 @@ const STAKING = (process.env.NEXT_PUBLIC_STAKING_ADDRESS || '').toLowerCase() as
 
 // Extend ERC20 ABI with a minimal "mint(address,uint256)" for MockBGLD on testnet
 const ERC20_WITH_MINT = [
-  ...(ERC20_ABI as any[]),
+  ...((ERC20_ABI as unknown) as any[]),
   {
     type: 'function',
     name: 'mint',
     stateMutability: 'nonpayable',
     inputs: [
-      { name: 'to',     type: 'address'  },
-      { name: 'amount', type: 'uint256'  },
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' },
     ],
     outputs: [],
   },
