@@ -1,7 +1,7 @@
 import './globals.css';
 import '@rainbow-me/rainbowkit/styles.css';
 
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 
 import Header from '@/components/Header';
@@ -13,7 +13,6 @@ export const metadata: Metadata = {
   description: 'Stake BGLD on Base. Simple locks, high APR, compounding.',
   applicationName: 'Base Gold',
   manifest: '/manifest.webmanifest',
-  themeColor: '#0b0b0f',
   icons: {
     icon: [
       { url: '/favicon.ico' },
@@ -38,17 +37,20 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: '#0b0b0f',
+};
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
-        {/* iOS meta */}
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className="min-h-screen flex flex-col bg-black text-white selection:bg-amber-400/25 selection:text-amber-200">
         <Web3Provider>
-          {/* Subtle top gold glow under header */}
           <div
             aria-hidden="true"
             className="pointer-events-none fixed inset-x-0 top-0 z-0 h-24 opacity-20 blur-3xl"
@@ -58,11 +60,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             }}
           />
           <Header />
-
           <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-24 pt-4 relative z-10">
             {children}
           </main>
-
           <Footer />
         </Web3Provider>
       </body>

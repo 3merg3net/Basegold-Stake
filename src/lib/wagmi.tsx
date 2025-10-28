@@ -1,49 +1,44 @@
 'use client';
 
-import { ReactNode } from 'react';
+import '@rainbow-me/rainbowkit/styles.css';
 import {
   RainbowKitProvider,
   getDefaultConfig,
   lightTheme,
 } from '@rainbow-me/rainbowkit';
 import { WagmiProvider } from 'wagmi';
-import { base, baseSepolia } from 'wagmi/chains'; // ✅ use wagmi/chains (not viem/chains)
-import { http } from 'viem';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { http } from 'viem';
+import { base, baseSepolia } from 'wagmi/chains';
+import { ReactNode } from 'react';
 
-// ---- Env switches ----
-const TARGET = (process.env.NEXT_PUBLIC_CHAIN || 'base').toLowerCase(); // 'base' | 'basesepolia'
-const WALLETCONNECT_ID =
-  process.env.NEXT_PUBLIC_WALLETCONNECT_ID || 'bgld-stake';
+const CHAIN = (process.env.NEXT_PUBLIC_CHAIN || 'basesepolia').toLowerCase();
+const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID || 84532);
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://sepolia.base.org';
+const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WALLETCONNECT_ID || 'demo';
 
-// Optional RPC overrides
-const RPC_BASE =
-  process.env.NEXT_PUBLIC_RPC_BASE || 'https://mainnet.base.org';
-const RPC_BASE_SEPOLIA =
-  process.env.NEXT_PUBLIC_RPC_BASESEPOLIA || 'https://sepolia.base.org';
-
-// Choose exactly one chain; cast as const to satisfy RainbowKit's tuple type
-const CHAINS =
-  TARGET === 'basesepolia' ? ([baseSepolia] as const) : ([base] as const);
+const target =
+  CHAIN_ID === base.id ? base :
+  CHAIN_ID === baseSepolia.id ? baseSepolia :
+  baseSepolia;
 
 const config = getDefaultConfig({
-  appName: 'Base Gold Staking',
-  projectId: WALLETCONNECT_ID,
-  chains: CHAINS, // ✅ now a readonly tuple of RainbowKitChain(s)
+  appName: 'Base Gold',
+  projectId: WC_PROJECT_ID,
+  chains: [target],
   transports: {
-    [base.id]: http(RPC_BASE),
-    [baseSepolia.id]: http(RPC_BASE_SEPOLIA),
+    [target.id]: http(RPC_URL),
   },
   ssr: true,
 });
 
-const queryClient = new QueryClient();
+const qc = new QueryClient();
 
 export function Web3Provider({ children }: { children: ReactNode }) {
   return (
     <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider theme={lightTheme({ accentColor: '#d4af37' })}>
+      <QueryClientProvider client={qc}>
+        <RainbowKitProvider theme={lightTheme({ overlayBlur: 'small' })}>
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>
