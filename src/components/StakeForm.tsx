@@ -20,28 +20,26 @@ import {
   formatPct,
 } from '@/lib/constants';
 
-// TS exports (not JSON)
+// TS ABIs (no JSON imports) — mainnet-ready
 import ERC20_ABI from '@/lib/abis/ERC20';
 import STAKING_ABI from '@/lib/abis/BaseGoldStaking';
 
 const TOKEN   = (process.env.NEXT_PUBLIC_BGLD_ADDRESS    || '').toLowerCase() as `0x${string}`;
 const STAKING = (process.env.NEXT_PUBLIC_STAKING_ADDRESS || '').toLowerCase() as `0x${string}`;
 
-/** Identify stake() variant from ABI */
-function detectStakeVariant(abi: readonly any[]) {
+/** Detect which stake() the contract exposes so we pass the right arg types */
+function detectStakeVariant(abi: any) {
   try {
-    const stake = abi.find((f) => f?.type === 'function' && f?.name === 'stake');
-    const types: string[] = stake?.inputs?.map((i: any) => i?.type) ?? [];
+    const stake = (abi as any[]).find((f) => f?.type === 'function' && f?.name === 'stake');
+    const types = stake?.inputs?.map((i: any) => i?.type) || [];
     const sig = types.join(',');
-
-    if (sig === 'uint256,uint32,bool') return { ok: true, kind: 'v3_uint32_bool' as const, types, sig };
-    if (sig === 'uint256,uint256,bool') return { ok: true, kind: 'v3_uint256_bool' as const, types, sig };
-    if (sig === 'uint256,uint8')        return { ok: true, kind: 'v2_uint8'       as const, types, sig };
-    if (sig === 'uint256,uint256')      return { ok: true, kind: 'v2_uint256'     as const, types, sig };
-
-    return { ok: false, kind: 'unknown' as const, types, sig };
+    if (sig === 'uint256,uint32,bool') return { ok: true, kind: 'v3_uint32_bool' as const };
+    if (sig === 'uint256,uint256,bool') return { ok: true, kind: 'v3_uint256_bool' as const };
+    if (sig === 'uint256,uint8')        return { ok: true, kind: 'v2_uint8'       as const };
+    if (sig === 'uint256,uint256')      return { ok: true, kind: 'v2_uint256'     as const };
+    return { ok: false, kind: 'unknown' as const };
   } catch {
-    return { ok: false, kind: 'unknown' as const, types: [], sig: '' };
+    return { ok: false, kind: 'unknown' as const };
   }
 }
 
@@ -51,7 +49,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
 
-  // ---- UI state ----
+  // UI state
   const [amount, setAmount] = useState<string>('');
   const [lockDays, setLockDays] = useState<number>(clampLock(initialLockDays));
   const [approvedUI, setApprovedUI] = useState<boolean>(false);
@@ -66,49 +64,41 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
   const amountNum = useMemo(() => Number(amount || 0), [amount]);
 
   const amountWei = useMemo(() => {
-    try {
-      return parseUnits((amount || '0').trim(), BGLD_DECIMALS);
-    } catch {
-      return 0n;
-    }
+    try { return parseUnits((amount || '0').trim(), BGLD_DECIMALS); }
+    catch { return 0n; }
   }, [amount]);
 
-  // ---- On-chain reads ----
-  const { data: balanceData } = useReadContract({
+  // Reads
+  const { data: balance = 0n } = useReadContract({
     abi: ERC20_ABI,
     address: TOKEN,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: { enabled: isConnected && !!address && !!TOKEN },
-  }) as unknown as { data?: bigint };
+  });
 
-  const balance = balanceData ?? 0n;
-
-  const { data: allowanceData, refetch: refetchAllowance } = useReadContract({
+  const { data: allowance = 0n, refetch: refetchAllowance } = useReadContract({
     abi: ERC20_ABI,
     address: TOKEN,
     functionName: 'allowance',
     args: address ? [address, STAKING] : undefined,
     query: { enabled: isConnected && !!address && !!STAKING && !!TOKEN },
-  }) as unknown as { data?: bigint; refetch: () => Promise<any> };
-
-  const allowance = allowanceData ?? 0n;
+  });
 
   const needsApprove = allowance < amountWei;
   const canApprove  = isConnected && !busy && amountWei > 0n && needsApprove;
   const canStake    = isConnected && !busy && amountWei > 0n && !needsApprove;
 
-  const onMax = () => setAmount(formatUnits(balance, BGLD_DECIMALS));
+  const onMax = () => setAmount(fmtToken(balance, BGLD_DECIMALS, 6)); // fill with readable value
 
-  // Detect stake signature (show in Debug + route args properly)
-  const stakeVariant = useMemo(() => detectStakeVariant(STAKING_ABI as readonly any[]), []);
+  const stakeVariant = useMemo(() => detectStakeVariant(STAKING_ABI), []);
 
-  // ---- Approve → Stake flow ----
+  // Approve
   const onApprove = async () => {
     try {
       setError(null); setTxHash(null); setBusy(true);
       if (!address) throw new Error('Connect wallet');
-      if (!TOKEN || !STAKING) throw new Error('Missing contract addresses in env');
+      if (!TOKEN || !STAKING) throw new Error('Missing contract addresses');
 
       const hash = await writeContractAsync({
         abi: ERC20_ABI,
@@ -122,59 +112,42 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
       await refetchAllowance();
       setApprovedUI(true);
     } catch (e: any) {
-      console.error(e);
       setError(e?.shortMessage || e?.message || 'Approve failed');
     } finally {
       setBusy(false);
     }
   };
 
+  // Stake
   const onStake = async () => {
     try {
       setError(null); setTxHash(null); setBusy(true);
       if (!address) throw new Error('Connect wallet');
-      if (!STAKING) throw new Error('Missing staking address in env');
+      if (!STAKING) throw new Error('Missing staking address');
 
-      // prepare args based on the detected signature
-      let args: any[] = [];
+      let args: readonly unknown[] = [];
       if (stakeVariant.ok && stakeVariant.kind === 'v3_uint32_bool') {
-        args = [amountWei, Number(lockDays), false];
+        args = [amountWei, Number(lockDays), false] as const;
       } else if (stakeVariant.ok && stakeVariant.kind === 'v3_uint256_bool') {
-        args = [amountWei, BigInt(lockDays), false];
+        args = [amountWei, BigInt(lockDays), false] as const;
       } else if (stakeVariant.ok && stakeVariant.kind === 'v2_uint8') {
-        args = [amountWei, Number(lockDays)];
+        args = [amountWei, Number(lockDays)] as const;
       } else if (stakeVariant.ok && stakeVariant.kind === 'v2_uint256') {
-        args = [amountWei, BigInt(lockDays)];
+        args = [amountWei, BigInt(lockDays)] as const;
       } else {
-        const stakeDef = (STAKING_ABI as readonly any[]).find(
-          (f) => f?.type === 'function' && f?.name === 'stake'
-        );
-        throw new Error(
-          `Unsupported stake() inputs in ABI: ${JSON.stringify(stakeDef?.inputs ?? [])}`
-        );
+        throw new Error('Unsupported stake() signature on this contract');
       }
 
-      // 1) simulate — if this fails, surface the reason and DO NOT open wallet
-      try {
-        await publicClient!.simulateContract({
-          abi: STAKING_ABI as any,
-          address: STAKING,
-          functionName: 'stake',
-          args,
-          account: address,
-        });
-      } catch (e: any) {
-        console.error('simulateContract(stake) reverted:', e);
-        const msg =
-          e?.reason ||
-          e?.metaMessages?.join('\n') ||
-          e?.shortMessage ||
-          e?.message ||
-          'Stake simulation failed';
-        throw new Error(msg);
-      }
+      // Pre-simulate to surface reverts clearly
+      await publicClient!.simulateContract({
+        abi: STAKING_ABI as any,
+        address: STAKING,
+        functionName: 'stake',
+        args,
+        account: address,
+      });
 
-      // 2) If simulate passed, send tx → wallet confirm
+      // Send tx
       const hash = await writeContractAsync({
         abi: STAKING_ABI as any,
         address: STAKING,
@@ -185,32 +158,26 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
       setTxHash(hash);
       await publicClient!.waitForTransactionReceipt({ hash });
 
-      // done
       setAmount('');
       setApprovedUI(false);
       await refetchAllowance();
     } catch (e: any) {
-      console.error('Stake failed:', e);
-      setError(e?.message || e?.shortMessage || 'Stake failed');
+      const msg =
+        e?.reason ||
+        e?.metaMessages?.join('\n') ||
+        e?.shortMessage ||
+        e?.message ||
+        'Stake failed';
+      setError(msg);
     } finally {
       setBusy(false);
     }
   };
 
   const estUsd = formatDemoUSD(amountNum);
-
-  // Emergency exit preview numbers (UI only)
   const principalPenalty = emergencyExitPenaltyPercent(lockDays, exitElapsed);
   const vestedPct = vestedRewardsPercent(lockDays, exitElapsed);
   const unvestedPct = unvestedRewardsPercent(lockDays, exitElapsed);
-
-  // for Debug panel: read the stake inputs without casting to mutable array
-  const stakeInputsList = useMemo(() => {
-    const def = (STAKING_ABI as readonly any[]).find(
-      (f) => f?.type === 'function' && f?.name === 'stake'
-    );
-    return (def?.inputs ?? []).map((i: any) => i?.type);
-  }, []);
 
   return (
     <div className="relative rounded-2xl border border-gold/30 bg-black/40 backdrop-blur-md p-6 overflow-hidden">
@@ -220,13 +187,13 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
       />
       <div className="relative space-y-6">
         {/* Balance / Net / Acct */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div className="text-sm text-white/70">Wallet Balance</div>
-          <div className="text-xs text-white/40">
+          <div className="text-xs text-white/40 shrink-0">
             net: {chainId ?? '—'} · acct: {address ? `${address.slice(0,6)}…${address.slice(-4)}` : '—'}
           </div>
-          <div className="text-sm text-gold font-semibold">
-            {formatUnits(balance, BGLD_DECIMALS)} {BGLD_SYMBOL}
+          <div className="text-sm text-gold font-semibold truncate text-right">
+            {fmtToken(balance, BGLD_DECIMALS, 2)} {BGLD_SYMBOL}
           </div>
         </div>
 
@@ -243,7 +210,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
             />
             <button
               onClick={onMax}
-              className="rounded-xl px-3 py-2 border border-gold/30 bg-black/30 hover:bg-black/50 text-gold text-sm"
+              className="rounded-xl px-3 py-2 border border-gold/30 bg-black/30 hover:bg-black/50 text-gold text-sm whitespace-nowrap"
             >
               MAX
             </button>
@@ -255,15 +222,17 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
         <div className="space-y-3">
           <label className="block text-sm text-white/80">Lock Duration</label>
 
-          <div className="grid grid-cols-6 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {[1,7,10,14,21,30].map((d) => (
               <button
                 key={d}
                 onClick={() => setLockDays(d)}
-                className={`rounded-xl px-3 py-3 border transition text-center
-                  ${lockDays === d
-                    ? 'border-gold bg-gold/10 text-gold'
-                    : 'border-white/15 bg-black/30 hover:bg-black/50 text-white/80'}`}
+                className={`rounded-xl px-3 py-3 border transition text-center whitespace-nowrap`}
+                style={{
+                  borderColor: lockDays === d ? 'rgba(212,175,55,.9)' : 'rgba(255,255,255,.15)',
+                  background: lockDays === d ? 'rgba(212,175,55,.08)' : 'rgba(0,0,0,.3)',
+                  color:      lockDays === d ? 'rgba(212,175,55,1)'  : 'rgba(255,255,255,.85)',
+                }}
               >
                 <div className="text-base font-semibold">{d}d</div>
                 <div className="text-[10px] opacity-70">{aprForDays(d)}% APR</div>
@@ -295,14 +264,13 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
         </div>
 
         {/* Approve / Stake */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <button
             onClick={onApprove}
             disabled={!canApprove}
-            className={`rounded-xl px-4 py-3 font-semibold
-              ${canApprove
-                ? 'bg-gold text-black hover:bg-[#e6c964]'
-                : 'bg-white/10 text-white/60 cursor-not-allowed'}`}
+            className={`rounded-xl px-3 py-3 font-semibold text-sm sm:text-base whitespace-nowrap overflow-hidden text-ellipsis
+              ${canApprove ? 'bg-gold text-black hover:bg-[#e6c964]'
+                           : 'bg-white/10 text-white/60 cursor-not-allowed'}`}
           >
             {approvedUI || !needsApprove ? 'Approved ✓' : (busy ? 'Approving…' : 'Approve')}
           </button>
@@ -310,60 +278,13 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
           <button
             onClick={onStake}
             disabled={!canStake}
-            className={`rounded-xl px-4 py-3 font-semibold
-              ${canStake
-                ? 'bg-gold text-black hover:bg-[#e6c964]'
-                : 'bg-white/10 text-white/60 cursor-not-allowed'}`}
+            className={`rounded-xl px-3 py-3 font-semibold text-sm sm:text-base whitespace-nowrap overflow-hidden text-ellipsis
+              ${canStake ? 'bg-gold text-black hover:bg-[#e6c964]'
+                         : 'bg-white/10 text-white/60 cursor-not-allowed'}`}
           >
             {busy ? 'Staking…' : 'Stake'}
           </button>
         </div>
-        {/* Test Mint (Sepolia only) */}
-{chainId === 84532 && (
-  <button
-    disabled={!isConnected || busy}
-    onClick={async () => {
-      try {
-        setBusy(true);
-        setError(null);
-        if (!isConnected || !address) throw new Error('Connect wallet');
-
-        const to = address as `0x${string}`;
-
-        const hash = await writeContractAsync({
-          abi: [
-            ...((ERC20_ABI as unknown) as any[]),
-            {
-              type: 'function',
-              name: 'mint',
-              stateMutability: 'nonpayable',
-              inputs: [
-                { name: 'to', type: 'address' },
-                { name: 'amount', type: 'uint256' },
-              ],
-              outputs: [],
-            },
-          ],
-          address: TOKEN,
-          functionName: 'mint',
-          args: [to, parseUnits('10000', BGLD_DECIMALS)], // 10k test tokens
-        });
-
-        setTxHash(hash);
-        await publicClient!.waitForTransactionReceipt({ hash });
-      } catch (e: any) {
-        console.error(e);
-        setError(e?.shortMessage || e?.message || 'Mint failed');
-      } finally {
-        setBusy(false);
-      }
-    }}
-    className="rounded-xl px-4 py-3 font-semibold border border-gold/40 bg-black/40 hover:bg-black/60 text-gold w-full"
-  >
-    🧪 Mint 10,000 MockBGLD
-  </button>
-)}
-
 
         {/* Status */}
         {txHash && (
@@ -382,8 +303,8 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
           <ul className="list-disc ml-5 space-y-1 text-white/80">
             <li>{`Rewards vest linearly across ${lockDays} days. Exiting early forfeits unvested rewards.`}</li>
             <li>
-              <span className="font-semibold">Emergency Exit</span>: Available anytime, but a small principal penalty applies
-              that <em>starts at 5%</em> on day 0 and decays to <em>0%</em> at maturity.
+              <span className="font-semibold">Emergency Exit</span>: Available anytime, but a principal penalty applies
+              and decays to <em>0%</em> at maturity.
             </li>
           </ul>
 
@@ -408,18 +329,9 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
             />
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
-              <div className="rounded-lg border border-white/10 bg-black/40 p-3 text-center">
-                <div className="text-[11px] uppercase tracking-wider text-white/60">Principal Penalty</div>
-                <div className="text-lg font-semibold text-gold">{formatPct(principalPenalty)}</div>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-black/40 p-3 text-center">
-                <div className="text-[11px] uppercase tracking-wider text-white/60">Vested Rewards</div>
-                <div className="text-lg font-semibold text-gold">{formatPct(vestedPct)}</div>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-black/40 p-3 text-center">
-                <div className="text-[11px] uppercase tracking-wider text-white/60">Unvested Forfeited</div>
-                <div className="text-lg font-semibold text-gold">{formatPct(unvestedPct)}</div>
-              </div>
+              <MetricBox label="Principal Penalty" value={formatPct(principalPenalty)} />
+              <MetricBox label="Vested Rewards" value={formatPct(vestedPct)} />
+              <MetricBox label="Unvested Forfeited" value={formatPct(unvestedPct)} />
             </div>
 
             <div className="text-xs text-white/60 mt-2">
@@ -427,42 +339,28 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
             </div>
           </div>
         </div>
-
-        {/* Debug */}
-        <div className="rounded-xl border border-white/10 bg-black/50 p-3 text-xs text-white/70 space-y-1">
-          <div className="font-semibold text-gold">Debug</div>
-          <div>TOKEN: {TOKEN}</div>
-          <div>STAKING: {STAKING}</div>
-          <div>chainId: {chainId}</div>
-          <div>account: {address}</div>
-          <div>amountWei: {amountWei.toString()}</div>
-          <div>allowance: {allowance.toString()}</div>
-          <div>needsApprove: {String(needsApprove)}</div>
-          <div>ERC20_ABI ok: {String(!!(ERC20_ABI as any)?.length)}</div>
-          <div>STAKING_ABI ok: {String(!!(STAKING_ABI as any)?.length)}</div>
-          <div>stake inputs seen: [{stakeInputsList.join('","')}]</div>
-          <div>inferred signature: {
-            stakeVariant.ok
-              ? (stakeVariant.kind === 'v3_uint32_bool'   ? 'stake(uint256,uint32,bool)'
-                : stakeVariant.kind === 'v3_uint256_bool' ? 'stake(uint256,uint256,bool)'
-                : stakeVariant.kind === 'v2_uint8'        ? 'stake(uint256,uint8)'
-                : stakeVariant.kind === 'v2_uint256'      ? 'stake(uint256,uint256)'
-                : 'unknown')
-              : 'unknown'
-          }</div>
-        </div>
       </div>
     </div>
   );
 }
 
-/* ===== Utils ===== */
+/* ---------- sub-components ---------- */
+function MetricBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-black/40 p-3 text-center">
+      <div className="text-[11px] uppercase tracking-wider text-white/60">{label}</div>
+      <div className="text-lg font-semibold text-gold truncate">{value}</div>
+    </div>
+  );
+}
+
+/* ---------- utils ---------- */
 function sanitizeNumber(s: string) {
   return s.replace(/[^\d.]/g, '').replace(/^(\d*\.?\d*).*$/, '$1');
 }
 function formatDemoUSD(v: number) {
   if (!v || Number.isNaN(v)) return '0.00';
-  const price = 0.0005; // visual hint only
+  const price = 0.0005; // purely a visual hint
   const usd = v * price;
   return usd < 1000 ? usd.toFixed(2) : Math.round(usd).toLocaleString();
 }
@@ -474,4 +372,14 @@ function explorerTxBaseUrl(chainId?: number) {
   if (chainId === 84532) return 'https://sepolia.basescan.org/tx';
   if (chainId === 8453)  return 'https://basescan.org/tx';
   return 'https://basescan.org/tx';
+}
+function fmtToken(v: bigint, decimals = 18, maxFrac = 2) {
+  try {
+    const s = formatUnits(v, decimals);
+    const [i, f = ''] = s.split('.');
+    const frac = f.slice(0, maxFrac);
+    const int = Number(i);
+    const intStr = Number.isFinite(int) ? int.toLocaleString() : i;
+    return frac ? `${intStr}.${frac}` : intStr;
+  } catch { return '0'; }
 }

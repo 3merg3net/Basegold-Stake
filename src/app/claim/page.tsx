@@ -1,27 +1,15 @@
-import ClaimDashboard from '@/components/ClaimDashboard';
-import VaultStats from '@/components/VaultStats';
+'use client';
 
-export const metadata = {
-  title: 'Claim Dashboard – Base Gold',
-  description: 'Select your staking lock, view APRs, and manage your vault claims.',
-};
+import PositionsPanel from '@/components/PositionsPanel';
 
-export default function ClaimPage() {
+export default function ClaimDashboardPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-black via-darkbg to-black text-white">
-      <section className="max-w-6xl mx-auto px-4 py-14">
-        <h1 className="text-4xl font-bold text-gold mb-3 text-center">Claim Dashboard</h1>
-        <p className="text-center text-gray-300 max-w-2xl mx-auto">
-          Choose your lock duration, stake BGLD, and let the vault auto-compound rewards for you.
-          You can always toggle manual or automatic compounding on the home page.
-        </p>
-      </section>
-
-      <VaultStats />
-
-      <section className="max-w-6xl mx-auto px-4 py-12">
-        <ClaimDashboard />
-      </section>
+    <main className="min-h-[60vh] px-6 py-10 max-w-6xl mx-auto text-white">
+      <h1 className="text-3xl font-semibold mb-6">Claim & Manage Vaults</h1>
+      <p className="text-white/80 mb-6">
+        View all your active vaults. Withdraw at maturity, compound to grow principal, toggle auto-compound, or use emergency exit if needed.
+      </p>
+      <PositionsPanel />
     </main>
   );
 }

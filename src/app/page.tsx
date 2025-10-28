@@ -1,84 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
 import Link from 'next/link';
-import dynamic from "next/dynamic";
-
-const Countdown = dynamic(() => import("@/components/Countdown"), { ssr: false });
-
-// Read default from env at build time (ISO string, e.g. 2025-11-01T17:00:00Z)
-const ENV_LAUNCH = process.env.NEXT_PUBLIC_LAUNCH_AT || ''; 
-
-function parseDate(s?: string | null) {
-  if (!s) return null;
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
-}
-
-function useQueryParam(key: string) {
-  const [value, setValue] = useState<string | null>(null);
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const url = new URL(window.location.href);
-    setValue(url.searchParams.get(key));
-  }, []);
-  return value;
-}
-
-function useCountdown(target: Date | null) {
-  const [now, setNow] = useState<Date>(new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  if (!target) return { done: true, d: 0, h: 0, m: 0, s: 0, totalMs: 0 };
-  const totalMs = target.getTime() - now.getTime();
-  const done = totalMs <= 0;
-  const ms = Math.max(0, totalMs);
-  const d = Math.floor(ms / (1000 * 60 * 60 * 24));
-  const h = Math.floor((ms / (1000 * 60 * 60)) % 24);
-  const m = Math.floor((ms / (1000 * 60)) % 60);
-  const s = Math.floor((ms / 1000) % 60);
-  return { done, d, h, m, s, totalMs: ms };
-}
+import { motion } from 'framer-motion';
+import MetricsStrip from '@/components/MetricsStrip';
 
 export default function HomePage() {
-  // Admin-only UI (for quick demos): /?admin=1
-  const isAdmin = useQueryParam('admin') === '1';
-
-  // Determine the initial launch date:
-  // 1) local override (if set via admin UI)  2) NEXT_PUBLIC_LAUNCH_AT  3) default +3 days from now
-  const localOverride = typeof window !== 'undefined' ? localStorage.getItem('bgld_launch_at') : null;
-  const initialTarget =
-    parseDate(localOverride) ||
-    parseDate(ENV_LAUNCH) ||
-    new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
-
-  const [target, setTarget] = useState<Date>(initialTarget);
-  const { done, d, h, m, s } = useCountdown(target);
-
-  // Admin update handler
-  const [newDateStr, setNewDateStr] = useState<string>(target.toISOString().slice(0, 19));
-  useEffect(() => {
-    // keep input synced if external change
-    setNewDateStr(target.toISOString().slice(0, 19));
-  }, [target]);
-
-  const onApplyAdminDate = () => {
-    // interpret as local time
-    const dt = new Date(newDateStr);
-    if (!isNaN(dt.getTime())) {
-      setTarget(dt);
-      localStorage.setItem('bgld_launch_at', dt.toISOString());
-    }
-  };
-
-  const launchLabel = useMemo(
-    () => (done ? 'Public staking is LIVE' : 'Public launch in'),
-    [done]
-  );
-
   return (
     <main className="min-h-screen bg-gradient-to-t from-black via-[#0a0a0a] to-black text-white">
       {/* Hero */}
@@ -89,109 +15,79 @@ export default function HomePage() {
           transition={{ duration: 0.8 }}
           className="text-5xl md:text-6xl font-extrabold tracking-tight"
         >
-          Stake Your Claim in <span className="text-gold">Base Gold</span>
+          Stake Your Claim in <span className="text-amber-300">Base Gold</span>
         </motion.h1>
+
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.8 }}
-          className="text-lg md:text-xl text-white/70 max-w-2xl mx-auto mt-4"
+          transition={{ delay: 0.25, duration: 0.8 }}
+          className="text-lg md:text-xl text-white/70 max-w-3xl mx-auto mt-4"
         >
-          Earn high-yield ETH rewards by locking your BGLD. Compound to grow your principal and boost future returns.
+          Lock BGLD to earn high-yield rewards. Compound to grow your principal and boost future returns.
+          Early exits are penalized and a small protocol fee on withdraw/compound strengthens the vault.
         </motion.p>
 
-        {/* CTA */}
+        {/* Primary CTA */}
         <div className="mt-8">
           <Link
             href="/stake"
-            className="px-8 py-4 bg-gold text-black font-semibold rounded-2xl hover:bg-gold-light transition"
+            className="px-8 py-4 bg-amber-300 text-black font-semibold rounded-2xl hover:bg-[#f1d371] transition"
           >
-            Go to Staking
+            Open the Vaults
           </Link>
         </div>
       </section>
 
-      {/* Demo Mode Announcement */}
-      <section className="px-6 pb-10 flex justify-center">
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="max-w-2xl w-full bg-black/60 backdrop-blur-md border border-gold/30 rounded-2xl p-6 md:p-8 text-center shadow-lg"
-        >
-          <h2 className="text-2xl font-semibold text-gold mb-2">🧪 Demo Mode</h2>
-          <p className="text-white/80 leading-relaxed">
-            Staking is currently running in <span className="font-semibold">demo mode</span>.
-            Early access will open for <span className="text-gold font-semibold">whales and select holders</span> first.
-            Once stability targets are met, public staking opens for everyone.
-          </p>
-        </motion.div>
+      {/* Live Vault Metrics */}
+      <section className="px-6 pb-12 max-w-6xl mx-auto w-full">
+        <MetricsStrip className="shadow-lg" />
       </section>
 
-      {/* Countdown */}
-      <section className="px-6 pb-20 flex justify-center">
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.3 }}
-          className="max-w-2xl w-full rounded-2xl border border-gold/30 bg-black/60 backdrop-blur-md p-6 md:p-8 text-center"
-        >
-          <div className="text-sm uppercase tracking-widest text-white/60">{launchLabel}</div>
+      {/* How It Works */}
+      <section className="px-6 pb-16 max-w-5xl mx-auto">
+        <div className="rounded-2xl border border-white/10 bg-black/50 p-6 md:p-8">
+          <h2 className="text-2xl font-semibold mb-4 text-amber-300">How Staking Works</h2>
+          <ol className="list-decimal pl-5 space-y-3 text-white/80 leading-relaxed">
+            <li>
+              Choose a lock term from <strong>1–30 days</strong>. Longer locks earn higher APR within the posted range.
+            </li>
+            <li>
+              At maturity you can <strong>Withdraw</strong> your principal + vested rewards, or <strong>Compound</strong> to roll rewards into principal and restart the chosen term.
+            </li>
+            <li>
+              <strong>Daily Manual Compounding</strong> is allowed once every 24h (if you prefer frequent growth).{' '}
+              <em>Auto-compound</em> can also be toggled per vault (protocol executes on its cadence).
+            </li>
+            <li>
+              Exiting early triggers an <strong>Early Exit Penalty</strong> on principal (decays linearly to 0% by maturity) and forfeits unvested rewards. This discourages short-term churn and protects vault health.
+            </li>
+            <li>
+              Protocol fees: a small fee on withdraw and on compound is routed back to strengthen the BGLD vault.
+            </li>
+          </ol>
 
-          {!done ? (
-            <div className="mx-auto mt-8 max-w-xl">
-  <Countdown />
-</div>
+          <div className="mt-5 rounded-xl border border-amber-300/20 bg-amber-300/5 p-4 text-sm text-amber-200">
+            <p className="font-semibold mb-1">Clarity First</p>
+            <p>
+              Rewards vest continuously over your chosen term. Compounding restarts the term. Early exits return your principal
+              minus the current penalty and pay out only the vested portion of rewards at that moment.
+            </p>
+          </div>
+        </div>
+      </section>
 
-          ) : (
-            <div className="mt-4 text-2xl font-semibold text-gold">
-              Start staking now →
-              <Link href="/stake" className="underline ml-2">
-                /stake
-              </Link>
-            </div>
-          )}
-
-          {/* Admin controls (optional): visit /?admin=1 to show */}
-          {isAdmin && (
-            <div className="mt-6 text-left border-t border-white/10 pt-4">
-              <div className="text-xs uppercase tracking-widest text-white/60 mb-2">Admin Override</div>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                <input
-                  type="datetime-local"
-                  value={newDateStr}
-                  onChange={(e) => setNewDateStr(e.target.value)}
-                  className="flex-1 rounded-xl bg-black/50 border border-white/15 px-3 py-2 outline-none focus:border-gold/60"
-                />
-                <button
-                  onClick={onApplyAdminDate}
-                  className="rounded-xl bg-gold text-black font-semibold px-4 py-2 hover:bg-gold-light"
-                >
-                  Apply
-                </button>
-                <button
-                  onClick={() => { localStorage.removeItem('bgld_launch_at'); location.reload(); }}
-                  className="rounded-xl border border-white/15 px-4 py-2 text-white/80 hover:bg-white/5"
-                >
-                  Clear Override
-                </button>
-              </div>
-              <p className="text-xs text-white/50 mt-2">
-                Permanent value comes from <code>NEXT_PUBLIC_LAUNCH_AT</code> in <code>.env.local</code>.
-              </p>
-            </div>
-          )}
-        </motion.div>
+      {/* Risk Disclosure */}
+      <section className="px-6 pb-24 max-w-5xl mx-auto">
+        <div className="rounded-2xl border border-white/10 bg-black/50 p-6 md:p-8">
+          <h3 className="text-xl font-semibold text-white mb-3">Risk & Responsibility</h3>
+          <p className="text-white/70 leading-relaxed">
+            Staking involves smart-contract risk and market risk. APRs are not guaranteed and can change via protocol governance/
+            parameters within posted bounds. Only stake what you can afford to lock. Read the{' '}
+            <Link href="/terms" className="underline text-amber-300">Terms</Link>.
+          </p>
+        </div>
       </section>
     </main>
-  );
-}
-
-function TimeBox({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-      <div className="text-3xl font-semibold text-gold tabular-nums">{String(value).padStart(2, '0')}</div>
-      <div className="text-xs uppercase tracking-widest text-white/60 mt-1">{label}</div>
-    </div>
   );
 }

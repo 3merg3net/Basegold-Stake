@@ -5,10 +5,10 @@ import Link from 'next/link';
 
 export default function Footer() {
   return (
-    <footer className="w-full border-t border-gold/20 bg-black/80 backdrop-blur-md py-10 text-center relative overflow-hidden">
-      {/* Gold glow at bottom center */}
+    <footer className="w-full border-t border-white/10 bg-black/80 backdrop-blur-md py-10 text-center relative overflow-hidden">
+      {/* Gold ambient glow */}
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-20 opacity-25 blur-3xl"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-24 opacity-25 blur-3xl"
         aria-hidden="true"
         style={{
           background:
@@ -26,25 +26,42 @@ export default function Footer() {
           />
         </Link>
 
-        <div className="text-sm text-gray-400 leading-relaxed">
+        <div className="text-sm text-white/60 leading-relaxed">
           <p>
             © {new Date().getFullYear()}{' '}
-            <span className="text-gold font-semibold">BaseReserve.Gold</span>
+            <span className="text-amber-300 font-semibold">BaseReserve.Gold</span>
           </p>
-          <p className="mt-1 text-xs text-gray-500">
-            Built on Base • Powered by ETH • Staked in Gold
+          <p className="mt-1 text-xs text-white/40">
+            Built on Base • Powered by ETH • Secured by the Vault
           </p>
         </div>
 
-        <div className="flex items-center gap-6 mt-3 text-xs text-gray-500">
-          <Link href="https://basescan.org/" target="_blank" className="hover:text-gold transition-colors">
-            View on BaseScan
+        <div className="flex items-center gap-6 mt-3 text-xs text-white/50">
+          <Link
+            href="https://basescan.org/"
+            target="_blank"
+            className="hover:text-amber-300 transition-colors"
+          >
+            BaseScan
           </Link>
-          <Link href="https://x.com/BaseReserveGold" target="_blank" className="hover:text-gold transition-colors">
-            Follow on X
+          <Link
+            href="https://x.com/BaseReserveGold"
+            target="_blank"
+            className="hover:text-amber-300 transition-colors"
+          >
+            X (Twitter)
           </Link>
-          <Link href="/docs" className="hover:text-gold transition-colors">
-            Docs
+          <Link
+            href="/terms"
+            className="hover:text-amber-300 transition-colors"
+          >
+            Terms
+          </Link>
+          <Link
+            href="/how-it-works"
+            className="hover:text-amber-300 transition-colors"
+          >
+            Mechanics
           </Link>
         </div>
       </div>

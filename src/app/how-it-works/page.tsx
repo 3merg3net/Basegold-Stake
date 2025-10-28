@@ -1,42 +1,35 @@
-export const metadata = {
-  title: "How It Works – Base Gold",
-  description:
-    "Simple overview of Base Gold staking: lock periods, compounding, and early exit rules.",
-};
-
 export default function HowItWorksPage() {
-  const STAKE_URL = process.env.NEXT_PUBLIC_STAKE_URL || "https://stake.basereserve.gold";
   return (
-    <main className="mx-auto max-w-3xl px-4 py-16 text-white">
-      <h1 className="text-3xl font-bold tracking-wide text-amber-300">How Staking Works</h1>
+    <main className="min-h-[60vh] px-6 py-10 max-w-4xl mx-auto text-white">
+      <h1 className="text-3xl font-semibold mb-6">How It Works</h1>
 
-      <section className="mt-6 space-y-4 text-white/85">
+      <section className="space-y-4 text-white/80 leading-relaxed">
         <p>
-          Stake <strong>$BGLD</strong> for a fixed period to earn rewards. If you turn on
-          <em> Auto-Compound</em>, earned rewards are applied to your principal, increasing your base for the next calculation—no extra steps.
+          Base Gold lets you lock BGLD into time-bound vaults (1–30 days) and earn rewards that vest continuously across the term.
+          The APR range is configured on-chain and published transparently. Longer locks target higher APR within bounds.
         </p>
-
-        <ul className="list-disc pl-5 space-y-2">
-          <li><strong>Lock Periods:</strong> 1–30 days. Longer locks target higher APRs.</li>
-          <li><strong>Compounding:</strong> rewards applied to principal when enabled.</li>
-          <li><strong>Emergency Exit:</strong> permitted anytime. A percentage of unvested rewards are forfeited; a small principal fee (up to 5%) applies and decreases as you approach maturity.</li>
-          <li><strong>Clarity:</strong> compounding uses rewards to grow your stake; we don’t “hold” user ETH outside executing your selection.</li>
-        </ul>
-
-        <p className="pt-2 text-white/70 text-sm">
-          Parameters can evolve to keep the system sustainable. Check the current terms in app before confirming a stake.
+        <p>
+          At maturity you can either withdraw your principal plus vested rewards, or compound to roll rewards into principal and
+          restart the chosen term. Compounding frequently increases your principal base, potentially boosting future rewards.
+        </p>
+        <p>
+          Exiting early is allowed, but a principal penalty applies that decays linearly from a maximum at day 0 to 0% at maturity,
+          and only the vested portion of rewards is paid. This design discourages short-term churn and helps maintain vault health.
+        </p>
+        <p>
+          A small fee on withdraw and on compound is routed back to the protocol to strengthen reserves and improve long-term
+          sustainability.
         </p>
       </section>
 
-      <div className="mt-8">
-        <a
-          href={STAKE_URL}
-          className="inline-block rounded-xl bg-amber-400/90 px-5 py-3 font-semibold text-black hover:bg-amber-300"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open Staking
-        </a>
+      <div className="rounded-2xl border border-white/10 bg-black/40 p-5 mt-8">
+        <h2 className="text-xl font-semibold text-amber-300 mb-2">Key Properties</h2>
+        <ul className="list-disc pl-6 space-y-2 text-white/80">
+          <li>Vesting is continuous over the selected term.</li>
+          <li>Compounding restarts the term and adds rewards to principal.</li>
+          <li>Early exit pays vested rewards and applies a time-decaying principal penalty.</li>
+          <li>Protocol fees on withdraw/compound feed the vault.</li>
+        </ul>
       </div>
     </main>
   );
