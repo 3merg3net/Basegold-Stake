@@ -20,18 +20,22 @@ import {
   formatPct,
 } from '@/lib/constants';
 
-// TS ABIs (no JSON imports) — mainnet-ready
+// TS ABIs (no JSON imports)
 import ERC20_ABI from '@/lib/abis/ERC20';
 import STAKING_ABI from '@/lib/abis/BaseGoldStaking';
 
 const TOKEN   = (process.env.NEXT_PUBLIC_BGLD_ADDRESS    || '').toLowerCase() as `0x${string}`;
 const STAKING = (process.env.NEXT_PUBLIC_STAKING_ADDRESS || '').toLowerCase() as `0x${string}`;
 
+// Gate for public staking (set to '1' to enable on prod)
+const PUBLIC_ENABLED = process.env.NEXT_PUBLIC_PUBLIC_STAKING_ENABLED === '1';
+
 /** Detect which stake() the contract exposes so we pass the right arg types */
-function detectStakeVariant(abi: any) {
+function detectStakeVariant(abi: unknown) {
   try {
-    const stake = (abi as any[]).find((f) => f?.type === 'function' && f?.name === 'stake');
-    const types = stake?.inputs?.map((i: any) => i?.type) || [];
+    const arr = abi as ReadonlyArray<any>;
+    const stake = arr.find((f) => f?.type === 'function' && f?.name === 'stake');
+    const types: string[] = stake?.inputs?.map((i: any) => i?.type) || [];
     const sig = types.join(',');
     if (sig === 'uint256,uint32,bool') return { ok: true, kind: 'v3_uint32_bool' as const };
     if (sig === 'uint256,uint256,bool') return { ok: true, kind: 'v3_uint256_bool' as const };
@@ -87,9 +91,12 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
 
   const needsApprove = allowance < amountWei;
   const canApprove  = isConnected && !busy && amountWei > 0n && needsApprove;
-  const canStake    = isConnected && !busy && amountWei > 0n && !needsApprove;
 
-  const onMax = () => setAmount(fmtToken(balance, BGLD_DECIMALS, 6)); // fill with readable value
+  // Stake is only allowed if public enabled
+  const stakeGateOk = PUBLIC_ENABLED;
+  const canStake    = isConnected && !busy && amountWei > 0n && !needsApprove && stakeGateOk;
+
+  const onMax = () => setAmount(fmtToken(balance, BGLD_DECIMALS, 6)); // readable fill
 
   const stakeVariant = useMemo(() => detectStakeVariant(STAKING_ABI), []);
 
@@ -104,7 +111,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
         abi: ERC20_ABI,
         address: TOKEN,
         functionName: 'approve',
-        args: [STAKING, amountWei],
+        args: [STAKING, amountWei] as const,
       });
 
       setTxHash(hash);
@@ -124,8 +131,14 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
       setError(null); setTxHash(null); setBusy(true);
       if (!address) throw new Error('Connect wallet');
       if (!STAKING) throw new Error('Missing staking address');
+      if (!stakeGateOk) throw new Error('Public staking is not yet enabled.');
 
-      let args: readonly unknown[] = [];
+      let args:
+        | readonly [bigint, number, boolean]
+        | readonly [bigint, bigint, boolean]
+        | readonly [bigint, number]
+        | readonly [bigint, bigint];
+
       if (stakeVariant.ok && stakeVariant.kind === 'v3_uint32_bool') {
         args = [amountWei, Number(lockDays), false] as const;
       } else if (stakeVariant.ok && stakeVariant.kind === 'v3_uint256_bool') {
@@ -140,16 +153,16 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
 
       // Pre-simulate to surface reverts clearly
       await publicClient!.simulateContract({
-        abi: STAKING_ABI as any,
+        abi: STAKING_ABI as unknown as readonly unknown[],
         address: STAKING,
         functionName: 'stake',
         args,
-        account: address,
+        account: address!,
       });
 
       // Send tx
       const hash = await writeContractAsync({
-        abi: STAKING_ABI as any,
+        abi: STAKING_ABI as unknown as readonly unknown[],
         address: STAKING,
         functionName: 'stake',
         args,
@@ -186,13 +199,23 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
         style={{ background: 'radial-gradient(500px 150px at 50% -10%, rgba(212,175,55,.25), transparent)' }}
       />
       <div className="relative space-y-6">
+
+        {/* --- Gold vault seeding banner (shows when public staking is OFF) --- */}
+        {!PUBLIC_ENABLED && (
+          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-300 text-center p-3 font-medium shadow-md animate-pulseGold">
+            <span className="drop-shadow-[0_0_8px_rgba(212,175,55,0.6)]">
+              Public staking will be live soon — Gold vault seeding in progress 
+            </span>
+          </div>
+        )}
+
         {/* Balance / Net / Acct */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-sm text-white/70">Wallet Balance</div>
-          <div className="text-xs text-white/40 shrink-0">
+        <div className="grid grid-cols-3 items-center gap-2">
+          <div className="text-sm text-white/70 truncate">Wallet Balance</div>
+          <div className="text-xs text-white/40 text-center truncate">
             net: {chainId ?? '—'} · acct: {address ? `${address.slice(0,6)}…${address.slice(-4)}` : '—'}
           </div>
-          <div className="text-sm text-gold font-semibold truncate text-right">
+          <div className="text-right text-sm text-gold font-semibold truncate">
             {fmtToken(balance, BGLD_DECIMALS, 2)} {BGLD_SYMBOL}
           </div>
         </div>
@@ -227,7 +250,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
               <button
                 key={d}
                 onClick={() => setLockDays(d)}
-                className={`rounded-xl px-3 py-3 border transition text-center whitespace-nowrap`}
+                className="rounded-xl px-3 py-3 border transition text-center whitespace-nowrap"
                 style={{
                   borderColor: lockDays === d ? 'rgba(212,175,55,.9)' : 'rgba(255,255,255,.15)',
                   background: lockDays === d ? 'rgba(212,175,55,.08)' : 'rgba(0,0,0,.3)',
@@ -281,10 +304,17 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
             className={`rounded-xl px-3 py-3 font-semibold text-sm sm:text-base whitespace-nowrap overflow-hidden text-ellipsis
               ${canStake ? 'bg-gold text-black hover:bg-[#e6c964]'
                          : 'bg-white/10 text-white/60 cursor-not-allowed'}`}
+            title={!stakeGateOk ? 'Vault seeding in progress — public staking opens soon' : undefined}
           >
-            {busy ? 'Staking…' : 'Stake'}
+            {stakeGateOk ? (busy ? 'Staking…' : 'Stake') : 'Stake (disabled)'}
           </button>
         </div>
+
+        {!stakeGateOk && (
+          <div className="text-xs text-amber-300/80 text-center">
+            Vault seeding in progress. Staking will open publicly once complete.
+          </div>
+        )}
 
         {/* Status */}
         {txHash && (
@@ -297,14 +327,14 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
         )}
         {error && <div className="text-sm text-red-400 whitespace-pre-wrap">{error}</div>}
 
-        {/* Policy Copy */}
+        {/* Mechanics copy */}
         <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-sm leading-relaxed">
           <div className="font-semibold text-gold mb-1">Reward Vesting & Early Exit</div>
           <ul className="list-disc ml-5 space-y-1 text-white/80">
             <li>{`Rewards vest linearly across ${lockDays} days. Exiting early forfeits unvested rewards.`}</li>
             <li>
-              <span className="font-semibold">Emergency Exit</span>: Available anytime, but a principal penalty applies
-              and decays to <em>0%</em> at maturity.
+              <span className="font-semibold">Emergency Exit</span>: Available anytime; a principal penalty applies and
+              decays to <em>0%</em> at maturity.
             </li>
           </ul>
 
@@ -360,7 +390,7 @@ function sanitizeNumber(s: string) {
 }
 function formatDemoUSD(v: number) {
   if (!v || Number.isNaN(v)) return '0.00';
-  const price = 0.0005; // purely a visual hint
+  const price = 0.0005; // visual hint only
   const usd = v * price;
   return usd < 1000 ? usd.toFixed(2) : Math.round(usd).toLocaleString();
 }
