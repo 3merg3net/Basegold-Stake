@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   useAccount,
   useChainId,
+  usePublicClient,
   useReadContract,
   useWriteContract,
-  usePublicClient,
 } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
 
@@ -20,29 +20,27 @@ import {
   formatPct,
 } from '@/lib/constants';
 
-// TS ABIs (no JSON imports) — mainnet-ready
 import ERC20_ABI from '@/lib/abis/ERC20';
 import STAKING_ABI from '@/lib/abis/BaseGoldStaking';
 
+// ────────────────────────────────────────────────────────────────────────────────
+// Env (lowercased because code compares lowercase 0x addresses)
 const TOKEN   = (process.env.NEXT_PUBLIC_BGLD_ADDRESS    || '').toLowerCase() as `0x${string}`;
 const STAKING = (process.env.NEXT_PUBLIC_STAKING_ADDRESS || '').toLowerCase() as `0x${string}`;
 
-// If set to "1", we only disable on MAINNET (8453). Testing on Sepolia remains enabled.
-const DISABLE_PUBLIC_FLAG = (process.env.NEXT_PUBLIC_DISABLE_STAKING || '0') === '1';
-
-/** Detect which stake() the contract exposes so we pass the right arg types */
+// Detect stake() variant from ABI so we pass the right arg types
 function detectStakeVariant(abi: any) {
   try {
-    const stake = (abi as any[]).find((f) => f?.type === 'function' && f?.name === 'stake');
+    const stake = (abi as any[])?.find?.((f) => f?.type === 'function' && f?.name === 'stake');
     const types = stake?.inputs?.map((i: any) => i?.type) || [];
     const sig = types.join(',');
-    if (sig === 'uint256,uint32,bool') return { ok: true, kind: 'v3_uint32_bool' as const };
-    if (sig === 'uint256,uint256,bool') return { ok: true, kind: 'v3_uint256_bool' as const };
-    if (sig === 'uint256,uint8')        return { ok: true, kind: 'v2_uint8'       as const };
-    if (sig === 'uint256,uint256')      return { ok: true, kind: 'v2_uint256'     as const };
-    return { ok: false, kind: 'unknown' as const };
+    if (sig === 'uint256,uint32,bool') return { ok: true, kind: 'v3_uint32_bool' as const, sig, types };
+    if (sig === 'uint256,uint256,bool') return { ok: true, kind: 'v3_uint256_bool' as const, sig, types };
+    if (sig === 'uint256,uint8')        return { ok: true, kind: 'v2_uint8'       as const, sig, types };
+    if (sig === 'uint256,uint256')      return { ok: true, kind: 'v2_uint256'     as const, sig, types };
+    return { ok: false, kind: 'unknown' as const, sig, types };
   } catch {
-    return { ok: false, kind: 'unknown' as const };
+    return { ok: false, kind: 'unknown' as const, sig: '', types: [] as string[] };
   }
 }
 
@@ -52,7 +50,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
 
-  // UI state
+  // ── UI state
   const [amount, setAmount] = useState<string>('');
   const [lockDays, setLockDays] = useState<number>(clampLock(initialLockDays));
   const [approvedUI, setApprovedUI] = useState<boolean>(false);
@@ -71,7 +69,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
     catch { return 0n; }
   }, [amount]);
 
-  // Reads
+  // ── On-chain reads
   const { data: balance = 0n } = useReadContract({
     abi: ERC20_ABI,
     address: TOKEN,
@@ -88,18 +86,19 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
     query: { enabled: isConnected && !!address && !!STAKING && !!TOKEN },
   });
 
+  // Button gating:
+  //  - Approve enabled when amount > 0 and allowance < amount
+  //  - Stake enabled when amount > 0 (we pre-simulate; clearer for team testing)
   const needsApprove = allowance < amountWei;
   const canApprove  = isConnected && !busy && amountWei > 0n && needsApprove;
-  const canStake    = isConnected && !busy && amountWei > 0n && !needsApprove;
+  const canStake    = isConnected && !busy && amountWei > 0n; // don't hard-gate on allowance; simulate shows the reason
 
-  // Mainnet-only disable gate
-  const disableNow  = DISABLE_PUBLIC_FLAG && chainId === 8453;
+  const onMax = () => setAmount(fmtToken(balance, BGLD_DECIMALS, 6));
 
-  const onMax = () => setAmount(fmtToken(balance, BGLD_DECIMALS, 6)); // fill with readable value
-
+  // Detect ABI signature once
   const stakeVariant = useMemo(() => detectStakeVariant(STAKING_ABI), []);
 
-  // Approve
+  // ── Approve
   const onApprove = async () => {
     try {
       setError(null); setTxHash(null); setBusy(true);
@@ -124,13 +123,14 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
     }
   };
 
-  // Stake
+  // ── Stake
   const onStake = async () => {
     try {
       setError(null); setTxHash(null); setBusy(true);
       if (!address) throw new Error('Connect wallet');
       if (!STAKING) throw new Error('Missing staking address');
 
+      // Prepare args based on the detected signature
       let args: readonly unknown[] = [];
       if (stakeVariant.ok && stakeVariant.kind === 'v3_uint32_bool') {
         args = [amountWei, Number(lockDays), false] as const;
@@ -144,7 +144,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
         throw new Error('Unsupported stake() signature on this contract');
       }
 
-      // Pre-simulate to surface reverts clearly
+      // Pre-simulate to surface reverts before wallet confirm
       await publicClient!.simulateContract({
         abi: STAKING_ABI as any,
         address: STAKING,
@@ -164,13 +164,14 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
       setTxHash(hash);
       await publicClient!.waitForTransactionReceipt({ hash });
 
+      // Reset UI
       setAmount('');
       setApprovedUI(false);
       await refetchAllowance();
     } catch (e: any) {
       const msg =
         e?.reason ||
-        e?.metaMessages?.join('\n') ||
+        e?.metaMessages?.join?.('\n') ||
         e?.shortMessage ||
         e?.message ||
         'Stake failed';
@@ -233,7 +234,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
               <button
                 key={d}
                 onClick={() => setLockDays(d)}
-                className={`rounded-xl px-3 py-3 border transition text-center whitespace-nowrap`}
+                className="rounded-xl px-3 py-3 border transition text-center whitespace-nowrap"
                 style={{
                   borderColor: lockDays === d ? 'rgba(212,175,55,.9)' : 'rgba(255,255,255,.15)',
                   background: lockDays === d ? 'rgba(212,175,55,.08)' : 'rgba(0,0,0,.3)',
@@ -273,34 +274,26 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <button
             onClick={onApprove}
-            disabled={!canApprove || disableNow}
+            disabled={!canApprove}
             className={`rounded-xl px-3 py-3 font-semibold text-sm sm:text-base whitespace-nowrap overflow-hidden text-ellipsis
-              ${(!canApprove || disableNow) ? 'bg-white/10 text-white/60 cursor-not-allowed'
-                                            : 'bg-gold text-black hover:bg-[#e6c964]'}`}
+              ${canApprove ? 'bg-gold text-black hover:bg-[#e6c964]'
+                           : 'bg-white/10 text-white/60 cursor-not-allowed'}`}
           >
-            {disableNow ? 'Public staking disabled' :
-             approvedUI || !needsApprove ? 'Approved ✓' : (busy ? 'Approving…' : 'Approve')}
+            {approvedUI || !needsApprove ? 'Approved ✓' : (busy ? 'Approving…' : 'Approve')}
           </button>
 
           <button
             onClick={onStake}
-            disabled={!canStake || disableNow}
+            disabled={!canStake}
             className={`rounded-xl px-3 py-3 font-semibold text-sm sm:text-base whitespace-nowrap overflow-hidden text-ellipsis
-              ${(!canStake || disableNow) ? 'bg-white/10 text-white/60 cursor-not-allowed'
-                                          : 'bg-gold text-black hover:bg-[#e6c964]'}`}
+              ${canStake ? 'bg-gold text-black hover:bg-[#e6c964]'
+                         : 'bg-white/10 text-white/60 cursor-not-allowed'}`}
           >
-            {disableNow ? 'Public staking disabled' : (busy ? 'Staking…' : 'Stake')}
+            {busy ? 'Staking…' : 'Stake'}
           </button>
         </div>
 
-        {/* Small “why disabled?” line for debugging */}
-        {(!canApprove || !canStake || disableNow) && (
-          <div className="text-[11px] text-white/50">
-            debug → isConnected:{String(isConnected)} · amountWei&gt;0:{String(amountWei>0n)} · needsApprove:{String(needsApprove)} · canApprove:{String(canApprove)} · canStake:{String(canStake)} · disableNow:{String(disableNow)} · chainId:{chainId}
-          </div>
-        )}
-
-        {/* Status */}
+        {/* Tx / Errors */}
         {txHash && (
           <div className="text-sm">
             Tx:&nbsp;
@@ -322,7 +315,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
             </li>
           </ul>
 
-          {/* Emergency Exit Estimator */}
+          {/* Exit estimator (UI only) */}
           <div className="mt-4">
             <div className="text-sm font-semibold text-gold mb-2">Emergency Exit Preview</div>
 
@@ -354,7 +347,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
           </div>
         </div>
 
-        {/* Deep Debug block */}
+        {/* Debug (safe, plain text) */}
         <div className="rounded-xl border border-white/10 bg-black/50 p-3 text-xs text-white/70 space-y-1">
           <div className="font-semibold text-gold">Debug</div>
           <div>TOKEN: {TOKEN}</div>
@@ -366,20 +359,14 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
           <div>needsApprove: {String(needsApprove)}</div>
           <div>ERC20_ABI ok: {String(!!(ERC20_ABI as any)?.length)}</div>
           <div>STAKING_ABI ok: {String(!!(STAKING_ABI as any)?.length)}</div>
-          <div>
-            stake inputs seen: [
-            {
-              (STAKING_ABI as any[]).find((f: any) => f?.type === 'function' && f?.name === 'stake')
-                ?.inputs?.map((i: any) => i?.type)?.join('","')
-            }]
-          </div>
+          <div>stake signature: {stakeVariant.ok ? stakeVariant.sig : 'unknown'}</div>
         </div>
       </div>
     </div>
   );
 }
 
-/* ---------- sub-components ---------- */
+/* ───────────────────────── sub-components ───────────────────────── */
 function MetricBox({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-white/10 bg-black/40 p-3 text-center">
@@ -389,7 +376,7 @@ function MetricBox({ label, value }: { label: string; value: string }) {
   );
 }
 
-/* ---------- utils ---------- */
+/* ──────────────────────────── utils ─────────────────────────────── */
 function sanitizeNumber(s: string) {
   return s.replace(/[^\d.]/g, '').replace(/^(\d*\.?\d*).*$/, '$1');
 }
