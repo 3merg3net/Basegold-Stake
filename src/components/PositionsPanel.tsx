@@ -1,23 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import {
-  useAccount,
-  usePublicClient,
-  useReadContract,
-  useReadContracts,
-  useWriteContract,
-} from 'wagmi';
+import { useEffect, useMemo, useState } from 'react';
+import { useAccount, usePublicClient, useReadContract, useReadContracts, useWriteContract } from 'wagmi';
 import { formatUnits } from 'viem';
+
 import STAKING_ABI from '@/lib/abis/BaseGoldStaking';
-import ERC20_ABI from '@/lib/abis/ERC20';
-import { aprForDays, BGLD_DECIMALS, BGLD_SYMBOL } from '@/lib/constants';
+import { BGLD_DECIMALS, BGLD_SYMBOL, aprForDays } from '@/lib/constants';
 
-const STAKING = (process.env.NEXT_PUBLIC_STAKING_ADDRESS || '').trim().toLowerCase() as
-  | `0x${string}`
-  | '';
-
-const DEBUG = (process.env.NEXT_PUBLIC_DEBUG_METRICS || '0').trim() === '1';
+const STAKING = (process.env.NEXT_PUBLIC_STAKING_ADDRESS || '').toLowerCase() as `0x${string}`;
 
 type Position = {
   id: bigint;
@@ -37,167 +27,121 @@ export default function PositionsPanel() {
   const [status, setStatus] = useState<string>('');
   const [busyId, setBusyId] = useState<bigint | null>(null);
 
-  const canRead = Boolean(address && STAKING);
-
-  // 1) fetch ids (never gate this behind feature flags)
-  const idsRead = useReadContract({
-    abi: STAKING_ABI,
+  // ids of this user
+  const { data: idsData, refetch: refetchIds, isFetching: fetchingIds } = useReadContract({
+    abi: STAKING_ABI as any,
     address: STAKING || undefined,
     functionName: 'positionsOf',
     args: address ? [address] : undefined,
-    query: { enabled: canRead },
+    query: { enabled: Boolean(address && STAKING) },
   });
 
   const ids = useMemo<bigint[]>(
-    () => (Array.isArray(idsRead.data) ? (idsRead.data as bigint[]) : []),
-    [idsRead.data],
+    () => (Array.isArray(idsData) ? (idsData as bigint[]) : []),
+    [idsData]
   );
 
-  // 2) batch fetch per id (allowFailure=true so one revert doesn't kill all)
+  // batch reads per id: positions, pendingRewards, principalExitFeeBps
   const reads = useMemo(() => {
-    if (!ids.length || !STAKING) return [];
+    if (!ids.length) return [];
     const calls: any[] = [];
     for (const id of ids) {
       calls.push(
-        { abi: STAKING_ABI, address: STAKING, functionName: 'positions', args: [id] },
-        { abi: STAKING_ABI, address: STAKING, functionName: 'pendingRewards', args: [id] },
-        { abi: STAKING_ABI, address: STAKING, functionName: 'principalExitFeeBps', args: [id] },
+        { abi: STAKING_ABI as any, address: STAKING, functionName: 'positions', args: [id] },
+        { abi: STAKING_ABI as any, address: STAKING, functionName: 'pendingRewards', args: [id] },
+        { abi: STAKING_ABI as any, address: STAKING, functionName: 'principalExitFeeBps', args: [id] },
       );
     }
     return calls;
   }, [ids]);
 
-  const batch = useReadContracts({
+  const { data: batchData, refetch: refetchBatch, isFetching: fetchingBatch } = useReadContracts({
     allowFailure: true,
     contracts: reads as any,
     query: { enabled: reads.length > 0 },
   });
 
   const rows = useMemo(() => {
-    if (!ids.length) return [];
+    if (!ids.length || !batchData) return [];
     const out: Array<{
       id: bigint;
-      pos?: Position;
-      vested?: bigint;
-      totalRewards?: bigint;
-      exitFeeBps?: bigint;
-      ok: boolean;
+      pos: Position;
+      vested: bigint;
+      totalRewards: bigint;
+      exitFeeBps: bigint;
     }> = [];
 
     let i = 0;
     for (const id of ids) {
-      const posRes = batch.data?.[i++] || { status: 'failure' as const };
-      const rewRes = batch.data?.[i++] || { status: 'failure' as const };
-      const feeRes = batch.data?.[i++] || { status: 'failure' as const };
+      const posRaw = batchData[i++]?.result as any;
+      const rewRaw = batchData[i++]?.result as [bigint, bigint] | undefined;
+      const feeRaw = batchData[i++]?.result as bigint | undefined;
 
-      const ok =
-        posRes.status === 'success' &&
-        rewRes.status === 'success' &&
-        feeRes.status === 'success';
+      if (!posRaw) continue;
 
-      let pos: Position | undefined;
-      let vested: bigint | undefined;
-      let totalRewards: bigint | undefined;
-      let exitFeeBps: bigint | undefined;
-
-      if (posRes.status === 'success') {
-        const p: any = posRes.result;
-        pos = {
-          id,
-          owner: (p?.[0] ?? '0x0000000000000000000000000000000000000000') as `0x${string}`,
-          amount: p?.[1] ?? 0n,
-          start: p?.[2] ?? 0n,
-          daysLocked: Number(p?.[3] ?? 0),
-          autoCompound: Boolean(p?.[4]),
-          closed: Boolean(p?.[5]),
-        };
-      }
-      if (rewRes.status === 'success') {
-        const rr = rewRes.result as [bigint, bigint];
-        vested = rr?.[0] ?? 0n;
-        totalRewards = rr?.[1] ?? 0n;
-      }
-      if (feeRes.status === 'success') {
-        exitFeeBps = (feeRes.result as bigint) ?? 0n;
-      }
-
-      out.push({ id, pos, vested, totalRewards, exitFeeBps, ok });
-    }
-    return out.sort((a, b) => Number(b.id - a.id));
-  }, [ids, batch.data]);
-
-  async function refetchAll() {
-    await Promise.all([idsRead.refetch(), batch.refetch?.()]);
-  }
-
-  // actions (withdraw / emergencyExit / compound) — do not gate these with feature flags
-  async function perform(id: bigint, fn: 'withdraw' | 'emergencyExit' | 'compound') {
-    try {
-      if (!address || !STAKING) throw new Error('Missing wallet or staking address');
-      setBusyId(id);
-      setStatus('');
-
-      const base = {
-        abi: STAKING_ABI,
-        address: STAKING as `0x${string}`,
-        functionName: fn,
-        args: [id] as const,
+      const pos: Position = {
+        id,
+        owner: posRaw?.[0],
+        amount: posRaw?.[1] ?? 0n,
+        start: posRaw?.[2] ?? 0n,
+        daysLocked: Number(posRaw?.[3] ?? 0),
+        autoCompound: Boolean(posRaw?.[4]),
+        closed: Boolean(posRaw?.[5]),
       };
 
-      await publicClient!.simulateContract({ ...base, account: address });
-      const hash = await writeContractAsync(base);
+      const vested = rewRaw?.[0] ?? 0n;
+      const totalRewards = rewRaw?.[1] ?? 0n;
+      const exitFeeBps = feeRaw ?? 0n;
+
+      out.push({ id, pos, vested, totalRewards, exitFeeBps });
+    }
+
+    return out.sort((a, b) => Number(b.id - a.id));
+  }, [ids, batchData]);
+
+  const refetchAll = async () => { await Promise.all([refetchIds(), refetchBatch()]); };
+
+  async function perform(id: bigint, fn: 'withdraw' | 'emergencyExit' | 'compound') {
+    try {
+      if (!address || !publicClient) return;
+      setBusyId(id); setStatus('');
+
+      const args = { abi: STAKING_ABI as any, address: STAKING, functionName: fn as any, args: [id] as const };
+
+      // simulate (helps surface revert reasons)
+      await publicClient.simulateContract({ ...args, account: address });
+
+      const hash = await writeContractAsync(args as any);
       setStatus(`${fn} submitted: ${hash.slice(0, 10)}…`);
-      await publicClient!.waitForTransactionReceipt({ hash });
+      await publicClient.waitForTransactionReceipt({ hash });
       await refetchAll();
       setStatus(`${fn} confirmed ✓`);
     } catch (e: any) {
-      const msg =
-        e?.reason ||
-        e?.metaMessages?.join('\n') ||
-        e?.shortMessage ||
-        e?.message ||
-        'Transaction failed';
+      const msg = e?.reason || e?.shortMessage || e?.message || 'Transaction failed';
       setStatus(msg);
-    } finally {
-      setBusyId(null);
-    }
+    } finally { setBusyId(null); }
   }
 
   if (!address) {
-    return (
-      <div className="rounded-2xl border border-white/10 bg-black/40 p-5 text-sm text-white/70">
-        Connect your wallet to view your vaults.
-      </div>
-    );
+    return <div className="rounded-2xl border border-white/10 bg-black/40 p-5 text-sm text-white/70">
+      Connect your wallet to view your vaults.
+    </div>;
   }
-
-  // simple load/error states
-  const loading = idsRead.isLoading || batch.isLoading;
 
   return (
     <div className="rounded-2xl border border-white/10 bg-black/40 p-4 sm:p-5">
       <div className="mb-3 text-sm font-semibold text-amber-300">Your Vaults</div>
 
-      {loading && <div className="text-sm text-white/60">Loading…</div>}
+      {(fetchingIds || fetchingBatch) && rows.length === 0 && (
+        <div className="text-sm text-white/60">Loading your vaults…</div>
+      )}
 
-      {!loading && rows.length === 0 && (
-        <div className="text-sm text-white/60">
-          {ids.length === 0
-            ? 'No active vaults yet.'
-            : 'Unable to load vault details (partial read failure).'}
-        </div>
+      {rows.length === 0 && !fetchingIds && !fetchingBatch && (
+        <div className="text-sm text-white/60">No active vaults yet.</div>
       )}
 
       <div className="space-y-4">
-        {rows.map(({ id, pos, vested = 0n, totalRewards = 0n, exitFeeBps = 0n, ok }) => {
-          if (!pos) {
-            return (
-              <div key={String(id)} className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm">
-                Vault #{id.toString()} — read error (will retry on refresh).
-              </div>
-            );
-          }
-
+        {rows.map(({ id, pos, vested, totalRewards, exitFeeBps }) => {
           const now = Math.floor(Date.now() / 1000);
           const elapsed = Math.max(0, now - Number(pos.start));
           const termSecs = pos.daysLocked * 86400;
@@ -217,7 +161,6 @@ export default function PositionsPanel() {
                   <div className="text-xs uppercase tracking-widest text-white/60">Vault ID</div>
                   <div className="text-lg font-semibold text-amber-300">#{id.toString()}</div>
                 </div>
-
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => perform(id, 'compound')}
@@ -230,7 +173,8 @@ export default function PositionsPanel() {
                     onClick={() => perform(id, 'withdraw')}
                     disabled={!mature || busyId === id}
                     className={`min-w-[8.5rem] rounded-lg px-3 py-2 text-sm font-semibold whitespace-nowrap
-                      ${mature ? 'bg-gold text-black hover:bg-[#e6c964]' : 'bg-white/10 text-white/50 cursor-not-allowed'}`}
+                      ${mature ? 'bg-gold text-black hover:bg-[#e6c964]' : 'bg-white/10 text-white/50 cursor-not-allowed'}
+                    `}
                   >
                     Withdraw
                   </button>
@@ -257,7 +201,6 @@ export default function PositionsPanel() {
                 <span className="whitespace-nowrap">Exit fee now: <span className="text-amber-300">{exitFee}</span></span>
                 <span className="hidden sm:inline text-white/30">|</span>
                 <span className="whitespace-nowrap">{pos.closed ? 'Closed' : 'Open'}</span>
-                {!ok && <span className="text-red-300"> (partial read)</span>}
               </div>
             </div>
           );
@@ -269,22 +212,10 @@ export default function PositionsPanel() {
           {status}
         </div>
       )}
-
-      {DEBUG && (
-        <pre className="mt-3 whitespace-pre-wrap text-xs text-white/70 bg-black/40 border border-white/10 rounded-lg p-3">
-{`[PositionsPanel debug]
-address: ${address}
-STAKING: ${STAKING || '—'}
-ids status: ${idsRead.status} · ids: ${Array.isArray(ids) ? ids.map(x=>x.toString()).join(',') : '—'}
-batch status: ${batch.status} · len: ${batch.data?.length ?? 0}
-`}
-        </pre>
-      )}
     </div>
   );
 }
 
-/* ---------- UI helpers ---------- */
 function KV({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-lg border border-white/10 bg-black/40 p-3">
@@ -294,7 +225,6 @@ function KV({ label, value }: { label: string; value: string }) {
   );
 }
 
-/* ---------- format helpers ---------- */
 function fmtToken(v: bigint, decimals = 18, maxFrac = 2) {
   try {
     const s = formatUnits(v, decimals);
@@ -303,9 +233,7 @@ function fmtToken(v: bigint, decimals = 18, maxFrac = 2) {
     const int = Number(i);
     const intStr = Number.isFinite(int) ? int.toLocaleString() : i;
     return frac ? `${intStr}.${frac}` : intStr;
-  } catch {
-    return '0';
-  }
+  } catch { return '0'; }
 }
 
 function formatDuration(sec: number) {
