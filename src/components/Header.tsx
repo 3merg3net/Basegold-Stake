@@ -76,7 +76,14 @@ export default function Header() {
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 text-white">
           <div className="flex items-center gap-3">
             <span className="relative block h-10 w-10">
-              <Image src="/logo.png" alt="BGLD" fill sizes="40px" className="object-contain" />
+             <Image
+  src="/logo.png"
+  alt="Base Gold"
+  fill
+  sizes="(max-width: 640px) 64px, 80px"   // <- add this line
+  className="object-contain transition-transform duration-300 group-hover:scale-110 drop-shadow-[0_0_8px_rgba(212,175,55,0.6)]"
+/>
+
             </span>
             <span className="font-semibold text-amber-300">BASE GOLD</span>
           </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   useAccount,
   usePublicClient,
@@ -8,13 +8,19 @@ import {
   useReadContracts,
   useWriteContract,
 } from 'wagmi';
-import { formatUnits } from 'viem';
+import { formatUnits, type Abi } from 'viem';
 
 import STAKING_ABI from '@/lib/abis/BaseGoldStaking';
-import ERC20_ABI from '@/lib/abis/ERC20'; // (unused here but fine to keep if you want to show token labels elsewhere)
+import ERC20_ABI from '@/lib/abis/ERC20';
 import { BGLD_DECIMALS, BGLD_SYMBOL, aprForDays } from '@/lib/constants';
 
-const STAKING = (process.env.NEXT_PUBLIC_STAKING_ADDRESS || '').toLowerCase() as `0x${string}`;
+/* --- Safe env parsing --- */
+function envAddress(v?: string | null) {
+  const raw = (v || '').trim().toLowerCase();
+  return /^0x[0-9a-f]{40}$/.test(raw) ? (raw as `0x${string}`) : undefined;
+}
+const TOKEN   = envAddress(process.env.NEXT_PUBLIC_BGLD_ADDRESS);
+const STAKING = envAddress(process.env.NEXT_PUBLIC_STAKING_ADDRESS);
 
 type Position = {
   id: bigint;
@@ -26,36 +32,25 @@ type Position = {
   closed: boolean;
 };
 
-function abiHasSetAutoCompound(abi: unknown) {
-  try {
-    const arr = abi as ReadonlyArray<any>;
-    return !!arr.find(
-      (f) =>
-        f?.type === 'function' &&
-        f?.name === 'setAutoCompound' &&
-        Array.isArray(f?.inputs) &&
-        f.inputs.length === 2 &&
-        f.inputs[0]?.type?.startsWith('uint') &&
-        f.inputs[1]?.type === 'bool'
-    );
-  } catch {
-    return false;
-  }
-}
-const HAS_SET_AUTOCOMPOUND = abiHasSetAutoCompound(STAKING_ABI);
-
 export default function PositionsPanel() {
-  const { address } = useAccount();
+  const { address } = useAccount(); // `0x...` | undefined
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
 
   const [status, setStatus] = useState<string>('');
   const [busyId, setBusyId] = useState<bigint | null>(null);
-  const [togglingId, setTogglingId] = useState<bigint | null>(null);
+
+  if (!STAKING) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-black/40 p-5 text-sm text-white/70">
+        Staking contract address is not configured. Set <code>NEXT_PUBLIC_STAKING_ADDRESS</code>.
+      </div>
+    );
+  }
 
   // 1) ids for this user
   const { data: idsData, refetch: refetchIds } = useReadContract({
-    abi: STAKING_ABI,
+    abi: STAKING_ABI as unknown as Abi,
     address: STAKING,
     functionName: 'positionsOf',
     args: address ? [address] : undefined,
@@ -73,9 +68,9 @@ export default function PositionsPanel() {
     const calls: any[] = [];
     for (const id of ids) {
       calls.push(
-        { abi: STAKING_ABI, address: STAKING, functionName: 'positions', args: [id] as const },
-        { abi: STAKING_ABI, address: STAKING, functionName: 'pendingRewards', args: [id] as const },
-        { abi: STAKING_ABI, address: STAKING, functionName: 'principalExitFeeBps', args: [id] as const },
+        { abi: STAKING_ABI as unknown as Abi, address: STAKING, functionName: 'positions', args: [id] },
+        { abi: STAKING_ABI as unknown as Abi, address: STAKING, functionName: 'pendingRewards', args: [id] },
+        { abi: STAKING_ABI as unknown as Abi, address: STAKING, functionName: 'principalExitFeeBps', args: [id] },
       );
     }
     return calls;
@@ -120,7 +115,6 @@ export default function PositionsPanel() {
       result.push({ id, pos, vested, totalRewards, exitFeeBps });
     }
 
-    // newest first
     return result.sort((a, b) => Number(b.id - a.id));
   }, [ids, batchData]);
 
@@ -128,23 +122,28 @@ export default function PositionsPanel() {
     await Promise.all([refetchIds(), refetchBatch()]);
   };
 
-  // --- core actions ---
-  async function perform(
-    id: bigint,
-    req: { fn: 'withdraw' | 'emergencyExit' | 'compound' }
-  ) {
+  async function perform(id: bigint, req: { fn: 'withdraw' | 'emergencyExit' | 'compound' }) {
     try {
+      if (!address) throw new Error('Connect wallet');
+      if (!STAKING) throw new Error('Staking address not set');
+
       setBusyId(id);
       setStatus('');
+
       const base = {
-        abi: STAKING_ABI as unknown as readonly unknown[],
-        address: STAKING,
+        abi: STAKING_ABI as unknown as Abi,
+        address: STAKING as `0x${string}`,
         functionName: req.fn,
         args: [id] as const,
       };
 
-      await publicClient!.simulateContract({ ...base, account: address! });
-      const hash = await writeContractAsync({ ...base });
+      // simulate first for clear reverts
+      await publicClient!.simulateContract({
+        ...base,
+        account: address as `0x${string}`,
+      });
+
+      const hash = await writeContractAsync(base);
       setStatus(`${req.fn} submitted: ${hash.slice(0, 10)}…`);
       await publicClient!.waitForTransactionReceipt({ hash });
       await refetchAll();
@@ -159,38 +158,6 @@ export default function PositionsPanel() {
       setStatus(msg);
     } finally {
       setBusyId(null);
-    }
-  }
-
-  async function toggleAutoCompound(id: bigint, next: boolean) {
-    if (!HAS_SET_AUTOCOMPOUND) return;
-    try {
-      setTogglingId(id);
-      setStatus('');
-
-      const base = {
-        abi: STAKING_ABI as unknown as readonly unknown[],
-        address: STAKING,
-        functionName: 'setAutoCompound',
-        args: [id, next] as const,
-      };
-
-      await publicClient!.simulateContract({ ...base, account: address! });
-      const hash = await writeContractAsync({ ...base });
-      setStatus(`setAutoCompound submitted: ${hash.slice(0, 10)}…`);
-      await publicClient!.waitForTransactionReceipt({ hash });
-      await refetchAll();
-      setStatus(`Auto-compound ${next ? 'enabled' : 'disabled'} ✓`);
-    } catch (e: any) {
-      const msg =
-        e?.reason ||
-        e?.metaMessages?.join('\n') ||
-        e?.shortMessage ||
-        e?.message ||
-        'setAutoCompound failed';
-      setStatus(msg);
-    } finally {
-      setTogglingId(null);
     }
   }
 
@@ -224,64 +191,45 @@ export default function PositionsPanel() {
           const principalFmt = fmtToken(principal, BGLD_DECIMALS, 2);
 
           const exitFee = (Number(exitFeeBps) / 100).toFixed(2) + '%';
-          const maturedIn =
-            mature ? 'Mature' : formatDuration(termSecs - elapsed);
+          const maturedIn = mature ? 'Mature' : formatDuration(termSecs - elapsed);
 
           return (
             <div key={String(id)} className="rounded-xl border border-white/10 bg-black/30 p-4">
-              {/* Top row: ID + actions (no bleeding) */}
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+              {/* Top row: ID + action buttons */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-xs uppercase tracking-widest text-white/60">Vault ID</div>
                   <div className="text-lg font-semibold text-amber-300">#{id.toString()}</div>
-                  <div className="mt-1 text-xs text-white/50">
-                    {pos.autoCompound ? 'Auto-compound: ON' : 'Auto-compound: OFF'}
-                  </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  {HAS_SET_AUTOCOMPOUND && (
-                    <button
-                      onClick={() => toggleAutoCompound(id, !pos.autoCompound)}
-                      disabled={togglingId === id}
-                      className="min-w-[9.5rem] rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm font-semibold text-white/80 hover:bg-white/5 whitespace-nowrap"
-                    >
-                      {togglingId === id
-                        ? 'Updating…'
-                        : pos.autoCompound
-                        ? 'Disable Auto-Compound'
-                        : 'Enable Auto-Compound'}
-                    </button>
-                  )}
-
                   <button
                     onClick={() => perform(id, { fn: 'compound' })}
                     disabled={busyId === id}
-                    className="min-w-[8.75rem] rounded-lg bg-gold px-3 py-2 text-sm font-semibold text-black hover:bg-[#e6c964] whitespace-nowrap"
+                    className="min-w-[8.5rem] rounded-lg bg-gold px-3 py-2 text-sm font-semibold text-black hover:bg-[#e6c964] whitespace-nowrap"
                   >
                     {busyId === id ? 'Working…' : 'Compound'}
                   </button>
-
                   <button
                     onClick={() => perform(id, { fn: 'withdraw' })}
                     disabled={!mature || busyId === id}
-                    className={`min-w-[8.75rem] rounded-lg px-3 py-2 text-sm font-semibold whitespace-nowrap
-                      ${mature ? 'bg-gold text-black hover:bg-[#e6c964]' : 'bg-white/10 text-white/50 cursor-not-allowed'}`}
+                    className={`min-w-[8.5rem] rounded-lg px-3 py-2 text-sm font-semibold whitespace-nowrap
+                      ${mature ? 'bg-gold text-black hover:bg-[#e6c964]' : 'bg-white/10 text-white/50 cursor-not-allowed'}
+                    `}
                   >
                     Withdraw
                   </button>
-
                   <button
                     onClick={() => perform(id, { fn: 'emergencyExit' })}
                     disabled={busyId === id}
-                    className="min-w-[9.25rem] rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-200 hover:bg-red-500/20 whitespace-nowrap"
+                    className="min-w-[8.5rem] rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-200 hover:bg-red-500/20 whitespace-nowrap"
                   >
                     Emergency Exit
                   </button>
                 </div>
               </div>
 
-              {/* Metrics grid (tight, non-bleeding) */}
+              {/* Metrics grid */}
               <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 <KV label="Principal" value={`${principalFmt} ${BGLD_SYMBOL}`} />
                 <KV label="Term" value={`${pos.daysLocked}d`} />
@@ -293,9 +241,7 @@ export default function PositionsPanel() {
 
               {/* Footer line */}
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-white/60">
-                <span className="whitespace-nowrap">
-                  Exit fee now: <span className="text-amber-300">{exitFee}</span>
-                </span>
+                <span className="whitespace-nowrap">Exit fee now: <span className="text-amber-300">{exitFee}</span></span>
                 <span className="hidden sm:inline text-white/30">|</span>
                 <span className="whitespace-nowrap">{pos.closed ? 'Closed' : 'Open'}</span>
               </div>
