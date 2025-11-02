@@ -6,7 +6,8 @@ import type { ReactNode } from 'react';
 
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { Web3Provider } from '@/lib/wagmi';
+import { Web3Provider } from '@/providers/Web3Provider';
+
 
 export const metadata: Metadata = {
   title: 'Base Gold – Stake Your Claim',
