@@ -1,5 +1,6 @@
 import './globals.css';
 import '@rainbow-me/rainbowkit/styles.css';
+import EnvProbe from '@/components/EnvProbe';
 
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
@@ -52,6 +53,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="min-h-screen flex flex-col bg-black text-white selection:bg-amber-400/25 selection:text-amber-200">
         <Web3Provider>
+           <EnvProbe />
           <div
             aria-hidden="true"
             className="pointer-events-none fixed inset-x-0 top-0 z-0 h-24 opacity-20 blur-3xl"
