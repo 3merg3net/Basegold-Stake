@@ -20,15 +20,52 @@ import {
   formatPct,
 } from '@/lib/constants';
 
-// TS ABIs (no JSON imports)
 import ERC20_ABI from '@/lib/abis/ERC20';
 import STAKING_ABI from '@/lib/abis/BaseGoldStaking';
 
+/* ---------- env ---------- */
+const STAKING_ENABLED =
+  (process.env.NEXT_PUBLIC_STAKING_ENABLED || '0').trim() === '1';
 
 const TOKEN   = (process.env.NEXT_PUBLIC_BGLD_ADDRESS    || '').toLowerCase() as `0x${string}`;
 const STAKING = (process.env.NEXT_PUBLIC_STAKING_ADDRESS || '').toLowerCase() as `0x${string}`;
+const EXPECT_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID || 8453);
 
-/** Detect stake() variant so we pass the right arg types */
+/* ---------- helpers ---------- */
+function clampLock(n?: number) {
+  const x = Number(n || 14);
+  return Math.max(1, Math.min(30, Math.round(x)));
+}
+function sanitizeNumber(s: string) {
+  return s.replace(/[^\d.]/g, '').replace(/^(\d*\.?\d*).*$/, '$1');
+}
+function fmtToken(v: bigint, decimals = 18, maxFrac = 2) {
+  try {
+    const s = formatUnits(v, decimals);
+    const [i, f = ''] = s.split('.');
+    const frac = f.slice(0, maxFrac);
+    const int = Number(i);
+    const intStr = Number.isFinite(int) ? int.toLocaleString() : i;
+    return frac ? `${intStr}.${frac}` : intStr;
+  } catch { return '0'; }
+}
+function formatDemoUSD(v: number) {
+  if (!v || Number.isNaN(v)) return '0.00';
+  const price = 0.0005; // hint only
+  const usd = v * price;
+  return usd < 1000 ? usd.toFixed(2) : Math.round(usd).toLocaleString();
+}
+function safeErr(e: any): string {
+  return (
+    e?.reason ||
+    (Array.isArray(e?.metaMessages) ? e.metaMessages.join('\n') : '') ||
+    e?.shortMessage ||
+    e?.message ||
+    'Something went wrong'
+  );
+}
+
+/** Detect which stake() the contract exposes so we pass the right arg types */
 function detectStakeVariant(abi: any) {
   try {
     const stake = (abi as any[]).find((f) => f?.type === 'function' && f?.name === 'stake');
@@ -53,14 +90,17 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
   // UI state
   const [amount, setAmount] = useState<string>('');
   const [lockDays, setLockDays] = useState<number>(clampLock(initialLockDays));
-  const [autoCompound, setAutoCompound] = useState<boolean>(false); // default OFF per launch policy
   const [approvedUI, setApprovedUI] = useState<boolean>(false);
   const [busy, setBusy] = useState<boolean>(false);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exitElapsed, setExitElapsed] = useState<number>(0);
+  const [autoCompoundChoice, setAutoCompoundChoice] = useState<boolean>(false);
 
   useEffect(() => setLockDays(clampLock(initialLockDays)), [initialLockDays]);
+
+  // clear stale error when user edits input
+  useEffect(() => { setError(null); }, [amount, lockDays]);
 
   const apr = useMemo(() => aprForDays(lockDays), [lockDays]);
   const amountNum = useMemo(() => Number(amount || 0), [amount]);
@@ -87,15 +127,48 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
     query: { enabled: isConnected && !!address && !!STAKING && !!TOKEN },
   });
 
-  const needsApprove = allowance < amountWei;
-  const canApprove  = isConnected && !busy && amountWei > 0n && needsApprove;
-  const canStake    = isConnected && !busy && amountWei > 0n && !needsApprove;
-
-  const onMax = () => setAmount(fmtToken(balance, BGLD_DECIMALS, 6)); // readable fill
-
   const stakeVariant = useMemo(() => detectStakeVariant(STAKING_ABI), []);
 
-  // Approve
+  /* ---------- gating & reasons ---------- */
+  const onExpectedChain = chainId === EXPECT_CHAIN_ID;
+  const needsApprove = allowance < amountWei;
+  const stakeGateActive =
+    STAKING_ENABLED && onExpectedChain && !!address && !!TOKEN && !!STAKING;
+
+  const canApprove  = stakeGateActive && !busy && amountWei > 0n && needsApprove;
+  const canStake    = stakeGateActive && !busy && amountWei > 0n && !needsApprove;
+
+  const whyDisabledApprove = !stakeGateActive
+    ? !STAKING_ENABLED
+      ? 'Staking not enabled'
+      : !onExpectedChain
+        ? `Switch to chain ${EXPECT_CHAIN_ID}`
+        : !address
+          ? 'Connect wallet'
+          : 'Missing config'
+    : amountWei === 0n
+      ? 'Enter amount'
+      : needsApprove
+        ? ''
+        : 'Already approved';
+
+  const whyDisabledStake = !stakeGateActive
+    ? !STAKING_ENABLED
+      ? 'Staking not enabled'
+      : !onExpectedChain
+        ? `Switch to chain ${EXPECT_CHAIN_ID}`
+        : !address
+          ? 'Connect wallet'
+          : 'Missing config'
+    : amountWei === 0n
+      ? 'Enter amount'
+      : needsApprove
+        ? 'Approve first'
+        : '';
+
+  const onMax = () => setAmount(fmtToken(balance, BGLD_DECIMALS, 6));
+
+  /* ---------- actions ---------- */
   const onApprove = async () => {
     try {
       setError(null); setTxHash(null); setBusy(true);
@@ -114,13 +187,12 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
       await refetchAllowance();
       setApprovedUI(true);
     } catch (e: any) {
-      setError(e?.shortMessage || e?.message || 'Approve failed');
+      setError(safeErr(e));
     } finally {
       setBusy(false);
     }
   };
 
-  // Stake
   const onStake = async () => {
     try {
       setError(null); setTxHash(null); setBusy(true);
@@ -129,9 +201,9 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
 
       let args: readonly unknown[] = [];
       if (stakeVariant.ok && stakeVariant.kind === 'v3_uint32_bool') {
-        args = [amountWei, Number(lockDays), Boolean(autoCompound)] as const;
+        args = [amountWei, Number(lockDays), Boolean(autoCompoundChoice)] as const;
       } else if (stakeVariant.ok && stakeVariant.kind === 'v3_uint256_bool') {
-        args = [amountWei, BigInt(lockDays), Boolean(autoCompound)] as const;
+        args = [amountWei, BigInt(lockDays), Boolean(autoCompoundChoice)] as const;
       } else if (stakeVariant.ok && stakeVariant.kind === 'v2_uint8') {
         args = [amountWei, Number(lockDays)] as const;
       } else if (stakeVariant.ok && stakeVariant.kind === 'v2_uint256') {
@@ -140,29 +212,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
         throw new Error('Unsupported stake() signature on this contract');
       }
 
-      // ---- TEMP DEBUG: expose the env the UI is actually using ----
-const CHAIN_ID_RAW = Number(process.env.NEXT_PUBLIC_CHAIN_ID || 0);
-const STAKING_ENABLED = (process.env.NEXT_PUBLIC_STAKING_ENABLED || '0') === '1';
-const DISABLE_FLAG    = (process.env.NEXT_PUBLIC_DISABLE_STAKING || '0') === '1';
-
-if (typeof window !== 'undefined') {
-  (window as any).__bgld_env = {
-    TOKEN,
-    STAKING,
-    CHAIN_ID: CHAIN_ID_RAW,
-    STAKING_ENABLED,
-    DISABLE_FLAG,
-  };
-  // one-time log to console so you can see it immediately
-  // (guard to avoid spamming on every render)
-  if (!(window as any).__bgld_env_logged) {
-    (window as any).__bgld_env_logged = true;
-    console.log('[BGLD env]', (window as any).__bgld_env);
-  }
-}
-
-
-      // Pre-simulate to surface reverts clearly
+      // Pre-simulate for clean revert reasons (MetaMask Mobile safe)
       await publicClient!.simulateContract({
         abi: STAKING_ABI as any,
         address: STAKING,
@@ -186,18 +236,13 @@ if (typeof window !== 'undefined') {
       setApprovedUI(false);
       await refetchAllowance();
     } catch (e: any) {
-      const msg =
-        e?.reason ||
-        e?.metaMessages?.join('\n') ||
-        e?.shortMessage ||
-        e?.message ||
-        'Stake failed';
-      setError(msg);
+      setError(safeErr(e));
     } finally {
       setBusy(false);
     }
   };
 
+  /* ---------- computed UI values ---------- */
   const estUsd = formatDemoUSD(amountNum);
   const principalPenalty = emergencyExitPenaltyPercent(lockDays, exitElapsed);
   const vestedPct = vestedRewardsPercent(lockDays, exitElapsed);
@@ -286,16 +331,29 @@ if (typeof window !== 'undefined') {
             <span className="text-white/60"> &nbsp;(10% at 1d → 1200% at 30d)</span>
           </div>
 
-          {/* Auto-compound toggle (default OFF) */}
-          <label className="mt-2 flex items-center gap-2 text-sm text-white/70">
-            <input
-              type="checkbox"
-              checked={autoCompound}
-              onChange={(e) => setAutoCompound(e.target.checked)}
-              className="accent-amber-300 w-4 h-4"
-            />
-            Auto-compound rewards
-          </label>
+          {/* Auto-compound toggle + explanation */}
+          <div className="mt-2 flex items-center justify-between rounded-xl border border-white/10 bg-black/40 p-3">
+            <div className="pr-3">
+              <div className="text-sm font-semibold text-amber-200">Auto-Compound</div>
+              <div className="text-xs text-white/60">
+                When enabled, rewards are periodically rolled into principal and the lock restarts.
+                You can turn it off later from your vault.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAutoCompoundChoice((v) => !v)}
+              aria-pressed={autoCompoundChoice}
+              className={`relative w-16 h-9 rounded-full transition
+                ${autoCompoundChoice ? 'bg-amber-300' : 'bg-white/20'}`}
+              title="Toggle auto-compound"
+            >
+              <span
+                className={`absolute top-1 left-1 h-7 w-7 rounded-full bg-black transition
+                  ${autoCompoundChoice ? 'translate-x-7' : ''}`}
+              />
+            </button>
+          </div>
         </div>
 
         {/* Approve / Stake */}
@@ -303,10 +361,11 @@ if (typeof window !== 'undefined') {
           <button
             onClick={onApprove}
             disabled={!canApprove}
-            className={`w-full rounded-xl px-3 py-3 text-sm sm:text-base font-semibold transition
+            title={whyDisabledApprove || undefined}
+            className={`rounded-xl px-3 py-3 font-semibold text-sm sm:text-base whitespace-nowrap overflow-hidden text-ellipsis border
               ${canApprove
-                ? 'bg-white/5 border border-amber-300/40 text-amber-200 hover:bg-white/10'
-                : 'bg-white/5 border border-white/10 text-white/40 cursor-not-allowed'}`}
+                ? 'bg-gold text-black hover:bg-[#e6c964] border-gold/60'
+                : 'bg-white/10 text-white/70 border-white/20 cursor-not-allowed'}`}
           >
             {approvedUI || !needsApprove ? 'Approved ✓' : (busy ? 'Approving…' : 'Approve')}
           </button>
@@ -314,39 +373,44 @@ if (typeof window !== 'undefined') {
           <button
             onClick={onStake}
             disabled={!canStake}
-            className={`
-              w-full rounded-xl px-5 py-3 text-sm sm:text-base font-semibold transition
+            title={whyDisabledStake || undefined}
+            className={`rounded-xl px-3 py-3 font-semibold text-sm sm:text-base whitespace-nowrap overflow-hidden text-ellipsis border
               ${canStake
-                ? 'bg-gradient-to-r from-amber-300 to-yellow-400 text-black shadow-md hover:shadow-lg hover:scale-[1.02]'
-                : 'bg-white/10 text-white/40 cursor-not-allowed'}
-            `}
+                ? 'bg-gold text-black hover:bg-[#e6c964] border-gold/60'
+                : 'bg-white/10 text-white/70 border-white/20 cursor-not-allowed'}`}
           >
-            {busy ? 'Processing…' : (canStake ? 'Stake BGLD' : 'Enter amount to stake')}
+            {busy ? 'Staking…' : 'Stake'}
           </button>
         </div>
 
-        {/* Status */}
+        {/* Status / Errors */}
         {txHash && (
           <div className="text-sm">
             Tx:&nbsp;
             <a className="underline" href={`${explorerTxBaseUrl(chainId)}/${txHash}`} target="_blank" rel="noreferrer">
-              view on BaseScan
+              view on Basescan
             </a>
           </div>
         )}
-        {error && <div className="text-sm text-red-400 whitespace-pre-wrap">{error}</div>}
 
-        {/* Policy Copy */}
+        {error && (
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+            <div className="font-semibold mb-1">Action error</div>
+            <div className="whitespace-pre-wrap break-words">{error}</div>
+          </div>
+        )}
+
+        {/* Policy Copy + Emergency Exit Preview */}
         <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-sm leading-relaxed">
           <div className="font-semibold text-gold mb-1">Reward Vesting & Early Exit</div>
           <ul className="list-disc ml-5 space-y-1 text-white/80">
             <li>{`Rewards vest linearly across ${lockDays} days. Exiting early forfeits unvested rewards.`}</li>
             <li>
-              <span className="font-semibold">Emergency Exit</span>: Available anytime; principal penalty applies and decays to <em>0%</em> at maturity.
+              <span className="font-semibold">Emergency Exit</span>: Available anytime, but a principal penalty applies
+              and decays to <em>0%</em> at maturity.
             </li>
           </ul>
 
-          {/* Emergency Exit Estimator */}
           <div className="mt-4">
             <div className="text-sm font-semibold text-gold mb-2">Emergency Exit Preview</div>
 
@@ -392,32 +456,9 @@ function MetricBox({ label, value }: { label: string; value: string }) {
   );
 }
 
-/* ---------- utils ---------- */
-function sanitizeNumber(s: string) {
-  return s.replace(/[^\d.]/g, '').replace(/^(\d*\.?\d*).*$/, '$1');
-}
-function formatDemoUSD(v: number) {
-  if (!v || Number.isNaN(v)) return '0.00';
-  const price = 0.0005; // purely a visual hint
-  const usd = v * price;
-  return usd < 1000 ? usd.toFixed(2) : Math.round(usd).toLocaleString();
-}
-function clampLock(n?: number) {
-  const x = Number(n || 14);
-  return Math.max(1, Math.min(30, Math.round(x)));
-}
+/* ---------- misc ---------- */
 function explorerTxBaseUrl(chainId?: number) {
   if (chainId === 84532) return 'https://sepolia.basescan.org/tx';
   if (chainId === 8453)  return 'https://basescan.org/tx';
   return 'https://basescan.org/tx';
-}
-function fmtToken(v: bigint, decimals = 18, maxFrac = 2) {
-  try {
-    const s = formatUnits(v, decimals);
-    const [i, f = ''] = s.split('.');
-    const frac = f.slice(0, maxFrac);
-    const int = Number(i);
-    const intStr = Number.isFinite(int) ? int.toLocaleString() : i;
-    return frac ? `${intStr}.${frac}` : intStr;
-  } catch { return '0'; }
 }
