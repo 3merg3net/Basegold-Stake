@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   useAccount,
   usePublicClient,
@@ -8,19 +8,19 @@ import {
   useReadContracts,
   useWriteContract,
 } from 'wagmi';
-import { formatUnits } from 'viem';
+import { formatUnits, type Abi } from 'viem';
 
 import STAKING_ABI from '@/lib/abis/BaseGoldStaking';
 import ERC20_ABI from '@/lib/abis/ERC20';
 import { BGLD_DECIMALS, BGLD_SYMBOL, aprForDays } from '@/lib/constants';
 
 /* --- Safe env parsing --- */
-function envAddress(name: string, v?: string | null) {
+function envAddress(v?: string | null) {
   const raw = (v || '').trim().toLowerCase();
   return /^0x[0-9a-f]{40}$/.test(raw) ? (raw as `0x${string}`) : undefined;
 }
-const TOKEN   = envAddress('NEXT_PUBLIC_BGLD_ADDRESS',    process.env.NEXT_PUBLIC_BGLD_ADDRESS);
-const STAKING = envAddress('NEXT_PUBLIC_STAKING_ADDRESS', process.env.NEXT_PUBLIC_STAKING_ADDRESS);
+const TOKEN   = envAddress(process.env.NEXT_PUBLIC_BGLD_ADDRESS);
+const STAKING = envAddress(process.env.NEXT_PUBLIC_STAKING_ADDRESS);
 
 type Position = {
   id: bigint;
@@ -33,32 +33,34 @@ type Position = {
 };
 
 export default function PositionsPanel() {
-  const { address } = useAccount(); // address is `0x${string}` | undefined
+  const { address } = useAccount(); // `0x...` | undefined
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
 
   const [status, setStatus] = useState<string>('');
   const [busyId, setBusyId] = useState<bigint | null>(null);
 
-  // If staking address is not configured, show a friendly notice
   if (!STAKING) {
     return (
       <div className="rounded-2xl border border-white/10 bg-black/40 p-5 text-sm text-white/70">
-        Staking contract address is not configured. Please set <code>NEXT_PUBLIC_STAKING_ADDRESS</code>.
+        Staking contract address is not configured. Set <code>NEXT_PUBLIC_STAKING_ADDRESS</code>.
       </div>
     );
   }
 
   // 1) ids for this user
   const { data: idsData, refetch: refetchIds } = useReadContract({
-    abi: STAKING_ABI,
+    abi: STAKING_ABI as unknown as Abi,
     address: STAKING,
     functionName: 'positionsOf',
     args: address ? [address] : undefined,
     query: { enabled: !!address && !!STAKING },
   });
 
-  const ids = useMemo<bigint[]>(() => (Array.isArray(idsData) ? (idsData as bigint[]) : []), [idsData]);
+  const ids = useMemo<bigint[]>(
+    () => (Array.isArray(idsData) ? (idsData as bigint[]) : []),
+    [idsData]
+  );
 
   // 2) batch read positions, pending rewards, exit fee
   const reads = useMemo(() => {
@@ -66,9 +68,9 @@ export default function PositionsPanel() {
     const calls: any[] = [];
     for (const id of ids) {
       calls.push(
-        { abi: STAKING_ABI, address: STAKING, functionName: 'positions', args: [id] },
-        { abi: STAKING_ABI, address: STAKING, functionName: 'pendingRewards', args: [id] },
-        { abi: STAKING_ABI, address: STAKING, functionName: 'principalExitFeeBps', args: [id] },
+        { abi: STAKING_ABI as unknown as Abi, address: STAKING, functionName: 'positions', args: [id] },
+        { abi: STAKING_ABI as unknown as Abi, address: STAKING, functionName: 'pendingRewards', args: [id] },
+        { abi: STAKING_ABI as unknown as Abi, address: STAKING, functionName: 'principalExitFeeBps', args: [id] },
       );
     }
     return calls;
@@ -113,16 +115,13 @@ export default function PositionsPanel() {
       result.push({ id, pos, vested, totalRewards, exitFeeBps });
     }
 
-    // newest first
     return result.sort((a, b) => Number(b.id - a.id));
   }, [ids, batchData]);
 
-  // misc helpers
   const refetchAll = async () => {
     await Promise.all([refetchIds(), refetchBatch()]);
   };
 
-  // actions
   async function perform(id: bigint, req: { fn: 'withdraw' | 'emergencyExit' | 'compound' }) {
     try {
       if (!address) throw new Error('Connect wallet');
@@ -132,7 +131,7 @@ export default function PositionsPanel() {
       setStatus('');
 
       const base = {
-        abi: STAKING_ABI as const,
+        abi: STAKING_ABI as unknown as Abi,
         address: STAKING as `0x${string}`,
         functionName: req.fn,
         args: [id] as const,
@@ -192,8 +191,7 @@ export default function PositionsPanel() {
           const principalFmt = fmtToken(principal, BGLD_DECIMALS, 2);
 
           const exitFee = (Number(exitFeeBps) / 100).toFixed(2) + '%';
-          const maturedIn =
-            mature ? 'Mature' : formatDuration(termSecs - elapsed);
+          const maturedIn = mature ? 'Mature' : formatDuration(termSecs - elapsed);
 
           return (
             <div key={String(id)} className="rounded-xl border border-white/10 bg-black/30 p-4">
