@@ -20,27 +20,15 @@ import {
   formatPct,
 } from '@/lib/constants';
 
+// TS ABIs (no JSON imports)
 import ERC20_ABI from '@/lib/abis/ERC20';
 import STAKING_ABI from '@/lib/abis/BaseGoldStaking';
 
+
 const TOKEN   = (process.env.NEXT_PUBLIC_BGLD_ADDRESS    || '').toLowerCase() as `0x${string}`;
 const STAKING = (process.env.NEXT_PUBLIC_STAKING_ADDRESS || '').toLowerCase() as `0x${string}`;
-const PUBLIC_STAKING_ENABLED = (process.env.NEXT_PUBLIC_PUBLIC_STAKING_ENABLED || '').toLowerCase() === 'true';
 
-// optional “flip the switch” for dev/testing without touching env
-function useDevUnlock() {
-  const [on, setOn] = useState(false);
-  useEffect(() => {
-    try {
-      const s = new URLSearchParams(window.location.search);
-      if (s.get('dev') === '1') setOn(true);
-    } catch {}
-  }, []);
-  const envForce = (process.env.NEXT_PUBLIC_FORCE_ENABLE_STAKE || '').toLowerCase() === 'true';
-  return on || envForce;
-}
-
-/** Detect which stake() the contract exposes so we pass the right arg types */
+/** Detect stake() variant so we pass the right arg types */
 function detectStakeVariant(abi: any) {
   try {
     const stake = (abi as any[]).find((f) => f?.type === 'function' && f?.name === 'stake');
@@ -61,11 +49,11 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
   const chainId = useChainId();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
-  const DEV_UNLOCK = useDevUnlock();
 
   // UI state
   const [amount, setAmount] = useState<string>('');
   const [lockDays, setLockDays] = useState<number>(clampLock(initialLockDays));
+  const [autoCompound, setAutoCompound] = useState<boolean>(false); // default OFF per launch policy
   const [approvedUI, setApprovedUI] = useState<boolean>(false);
   const [busy, setBusy] = useState<boolean>(false);
   const [txHash, setTxHash] = useState<string | null>(null);
@@ -100,30 +88,10 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
   });
 
   const needsApprove = allowance < amountWei;
-
-  // ---- gating logic ----
-  const isBaseMainnet = chainId === 8453;
-  const isBaseSepolia = chainId === 84532;
-
-  // Allow staking on Sepolia (team testing) always.
-  // On mainnet, only if public flag is true — unless DEV unlock is on.
-  const stakeGateActive = !DEV_UNLOCK && isBaseMainnet && !PUBLIC_STAKING_ENABLED;
-
-  // Button enabled rules
   const canApprove  = isConnected && !busy && amountWei > 0n && needsApprove;
-  const canStake    = isConnected && !busy && amountWei > 0n && !needsApprove && (!stakeGateActive || isBaseSepolia || DEV_UNLOCK);
+  const canStake    = isConnected && !busy && amountWei > 0n && !needsApprove;
 
-  const stakeDisabledReason = !isConnected
-    ? 'Connect wallet'
-    : amountWei <= 0n
-      ? 'Enter amount'
-      : needsApprove
-        ? 'Approval required'
-        : (stakeGateActive && !isBaseSepolia && !DEV_UNLOCK)
-          ? 'Public staking locked (vault seeding)'
-          : '';
-
-  const onMax = () => setAmount(fmtToken(balance, BGLD_DECIMALS, 6));
+  const onMax = () => setAmount(fmtToken(balance, BGLD_DECIMALS, 6)); // readable fill
 
   const stakeVariant = useMemo(() => detectStakeVariant(STAKING_ABI), []);
 
@@ -159,16 +127,11 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
       if (!address) throw new Error('Connect wallet');
       if (!STAKING) throw new Error('Missing staking address');
 
-      // Respect gate unless sepolia or dev unlock
-      if (stakeGateActive && !isBaseSepolia && !DEV_UNLOCK) {
-        throw new Error('Public staking locked while vault is being seeded');
-      }
-
       let args: readonly unknown[] = [];
       if (stakeVariant.ok && stakeVariant.kind === 'v3_uint32_bool') {
-        args = [amountWei, Number(lockDays), false] as const;
+        args = [amountWei, Number(lockDays), Boolean(autoCompound)] as const;
       } else if (stakeVariant.ok && stakeVariant.kind === 'v3_uint256_bool') {
-        args = [amountWei, BigInt(lockDays), false] as const;
+        args = [amountWei, BigInt(lockDays), Boolean(autoCompound)] as const;
       } else if (stakeVariant.ok && stakeVariant.kind === 'v2_uint8') {
         args = [amountWei, Number(lockDays)] as const;
       } else if (stakeVariant.ok && stakeVariant.kind === 'v2_uint256') {
@@ -177,7 +140,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
         throw new Error('Unsupported stake() signature on this contract');
       }
 
-      // Pre-simulate
+      // Pre-simulate to surface reverts clearly
       await publicClient!.simulateContract({
         abi: STAKING_ABI as any,
         address: STAKING,
@@ -300,61 +263,44 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
             <span className="text-gold font-semibold">{apr}%</span>
             <span className="text-white/60"> &nbsp;(10% at 1d → 1200% at 30d)</span>
           </div>
+
+          {/* Auto-compound toggle (default OFF) */}
+          <label className="mt-2 flex items-center gap-2 text-sm text-white/70">
+            <input
+              type="checkbox"
+              checked={autoCompound}
+              onChange={(e) => setAutoCompound(e.target.checked)}
+              className="accent-amber-300 w-4 h-4"
+            />
+            Auto-compound rewards
+          </label>
         </div>
 
         {/* Approve / Stake */}
-<div className="grid grid-cols-2 gap-3 sm:gap-4 mt-2">
-  {/* APPROVE */}
-  <button
-    onClick={onApprove}
-    disabled={!canApprove}
-    aria-disabled={!canApprove}
-    className={`rounded-xl px-3 py-3 font-semibold text-sm sm:text-base whitespace-nowrap overflow-hidden text-ellipsis transition
-      ${canApprove
-        ? 'bg-gold text-black hover:bg-[#e6c964] shadow-[0_0_0_1px_rgba(212,175,55,.6)]'
-        : 'bg-black/35 text-white/75 border border-white/20 cursor-not-allowed'
-      }`}
-  >
-    {approvedUI || !needsApprove ? 'Approved ✓' : (busy ? 'Approving…' : 'Approve')}
-  </button>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <button
+            onClick={onApprove}
+            disabled={!canApprove}
+            className={`w-full rounded-xl px-3 py-3 text-sm sm:text-base font-semibold transition
+              ${canApprove
+                ? 'bg-white/5 border border-amber-300/40 text-amber-200 hover:bg-white/10'
+                : 'bg-white/5 border border-white/10 text-white/40 cursor-not-allowed'}`}
+          >
+            {approvedUI || !needsApprove ? 'Approved ✓' : (busy ? 'Approving…' : 'Approve')}
+          </button>
 
-  {/* STAKE */}
-  <button
-    onClick={onStake}
-    disabled={!canStake}
-    aria-disabled={!canStake}
-    className={`rounded-xl px-3 py-3 font-semibold text-sm sm:text-base whitespace-nowrap overflow-hidden text-ellipsis transition
-      ${canStake
-        ? 'bg-gold text-black hover:bg-[#e6c964] shadow-[0_0_0_1px_rgba(212,175,55,.6)]'
-        : 'bg-black/35 text-white/75 border border-white/20 cursor-not-allowed'
-      }`}
-  >
-    {busy ? 'Staking…' : 'Stake'}
-  </button>
-</div>
-
-{/* Why disabled (tiny helper) */}
-{(!canApprove || !canStake) && (
-  <div className="mt-2 text-xs text-white/60">
-    {(!isConnected) && 'Connect wallet to continue.'}
-    {(isConnected && amountWei === 0n) && ' Enter an amount to enable staking.'}
-    {(isConnected && amountWei > 0n && needsApprove) && ' Approve first, then Stake.'}
-  </div>
-)}
-
-
-        {/* DEBUG: shows exactly why buttons are disabled */}
-        <div className="mt-3 rounded-lg border border-white/10 bg-black/30 p-3 text-xs text-white/70 space-y-1">
-          <div className="font-semibold text-gold">Debug</div>
-          <div>CHAIN_ID: {chainId}</div>
-          <div>isBaseMainnet: {String(isBaseMainnet)} · isBaseSepolia: {String(isBaseSepolia)}</div>
-          <div>PUBLIC_STAKING_ENABLED: {String(PUBLIC_STAKING_ENABLED)} · DEV_UNLOCK: {String(DEV_UNLOCK)}</div>
-          <div>stakeGateActive: {String(stakeGateActive)}</div>
-          <div>isConnected: {String(isConnected)} · address: {address || '—'}</div>
-          <div>amountWei: {amountWei.toString()}</div>
-          <div>allowance: {allowance.toString()} · needsApprove: {String(needsApprove)}</div>
-          <div>canApprove: {String(canApprove)} · canStake: {String(canStake)}</div>
-          <div>TOKEN: {TOKEN || '—'} · STAKING: {STAKING || '—'}</div>
+          <button
+            onClick={onStake}
+            disabled={!canStake}
+            className={`
+              w-full rounded-xl px-5 py-3 text-sm sm:text-base font-semibold transition
+              ${canStake
+                ? 'bg-gradient-to-r from-amber-300 to-yellow-400 text-black shadow-md hover:shadow-lg hover:scale-[1.02]'
+                : 'bg-white/10 text-white/40 cursor-not-allowed'}
+            `}
+          >
+            {busy ? 'Processing…' : (canStake ? 'Stake BGLD' : 'Enter amount to stake')}
+          </button>
         </div>
 
         {/* Status */}
@@ -362,7 +308,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
           <div className="text-sm">
             Tx:&nbsp;
             <a className="underline" href={`${explorerTxBaseUrl(chainId)}/${txHash}`} target="_blank" rel="noreferrer">
-              view on Basescan
+              view on BaseScan
             </a>
           </div>
         )}
@@ -374,8 +320,7 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
           <ul className="list-disc ml-5 space-y-1 text-white/80">
             <li>{`Rewards vest linearly across ${lockDays} days. Exiting early forfeits unvested rewards.`}</li>
             <li>
-              <span className="font-semibold">Emergency Exit</span>: Available anytime, but a principal penalty applies
-              and decays to <em>0%</em> at maturity.
+              <span className="font-semibold">Emergency Exit</span>: Available anytime; principal penalty applies and decays to <em>0%</em> at maturity.
             </li>
           </ul>
 
@@ -431,7 +376,7 @@ function sanitizeNumber(s: string) {
 }
 function formatDemoUSD(v: number) {
   if (!v || Number.isNaN(v)) return '0.00';
-  const price = 0.0005; // visual hint only
+  const price = 0.0005; // purely a visual hint
   const usd = v * price;
   return usd < 1000 ? usd.toFixed(2) : Math.round(usd).toLocaleString();
 }

@@ -8,180 +8,125 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-gradient-to-t from-black via-[#0a0a0a] to-black text-white">
       {/* Hero */}
-      <section className="text-center py-20 md:py-24 px-6 relative overflow-hidden">
-        {/* Soft Gold Halo */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              'radial-gradient(900px 500px at 50% 30%, rgba(212,175,55,0.08), transparent 80%)',
-          }}
-        />
-
+      <section className="text-center py-20 md:py-24 px-6">
         <motion.h1
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
           className="text-5xl md:text-6xl font-extrabold tracking-tight"
         >
-          The First On-Chain <span className="text-amber-300">Gold Vault</span> on Base
+          Stake Your Claim in <span className="text-amber-300">Base Gold</span>
         </motion.h1>
 
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.25, duration: 0.8 }}
-          className="text-lg md:text-xl text-white/70 max-w-3xl mx-auto mt-4 leading-relaxed"
+          className="text-lg md:text-xl text-white/70 max-w-3xl mx-auto mt-4"
         >
-          Welcome to the next era of digital gold.{" "}
-          <span className="text-amber-300 font-semibold">Base Gold (BGLD)</span> is building the first
-          fully on-chain staking vault designed to preserve value, compound yield, and grow the Base ecosystem’s
-          strongest asset — trust in scarcity.
+          The first onchain <span className="text-amber-300 font-semibold">Gold Staking Vault</span> on Base.
+          Lock BGLD, earn high-yield rewards, and compound to grow your principal. A small protocol fee on
+          withdraw/compound strengthens the vault over time.
         </motion.p>
 
-        {/* Vault Status Pill */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45, duration: 0.6 }}
-          className="mt-6 inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-300/10 px-4 py-2 text-amber-200 text-xs font-semibold tracking-wide"
-        >
-          <span className="inline-block h-2 w-2 rounded-full bg-amber-300 animate-pulse"></span>
-          Vault Seeding in Progress · Public Staking Soon
-        </motion.div>
-
-        {/* CTA */}
+        {/* Primary CTA */}
         <div className="mt-8">
           <Link
             href="/stake"
             className="px-8 py-4 bg-amber-300 text-black font-semibold rounded-2xl hover:bg-[#f1d371] transition"
           >
-            Prepare to Stake
+            Start Staking — Live Now
           </Link>
         </div>
 
-        {/* Sub-headline */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6, duration: 1 }}
-          className="mt-6 text-white/60 text-sm uppercase tracking-widest"
-        >
-          Built on Base · Powered by ETH · Backed by Gold Logic
-        </motion.p>
+        {/* Hype subtext */}
+        <p className="mt-4 text-sm text-white/60">
+          Built on <span className="text-[#0AA0FF] font-semibold">Base</span> · Powered by ETH · Staked in Gold
+        </p>
       </section>
 
       {/* Live Vault Metrics */}
-      <section className="px-6 pb-12 max-w-6xl mx-auto w-full">
+      <section className="px-6 pb-10 max-w-6xl mx-auto w-full">
         <MetricsStrip className="shadow-lg" />
       </section>
 
-      {/* The Narrative */}
-      <section className="px-6 pb-20 max-w-5xl mx-auto text-center">
-        <motion.h2
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="text-3xl font-semibold text-amber-300 mb-4"
-        >
-          A New Gold Standard for DeFi
-        </motion.h2>
-        <p className="text-white/70 leading-relaxed text-lg max-w-3xl mx-auto">
-          The <span className="text-amber-300 font-semibold">Base Gold Vault</span> transforms passive holding
-          into a yield-compounding engine. Each stake feeds the vault, each compound strengthens it.
-          Every exit contributes a fraction back to the system — creating a closed-loop of sustainable value.
-        </p>
-        <p className="mt-4 text-white/60 max-w-2xl mx-auto text-base">
-          This isn’t just another staking pool. It’s a decentralized, self-reinforcing Gold reserve built on Base,
-          for Base. When you stake, you don’t just earn — you help define the foundation of Base’s Golden Claim.
-        </p>
-      </section>
-
-      {/* How It Works */}
+      {/* Compounding & Mechanics */}
       <section className="px-6 pb-16 max-w-5xl mx-auto">
         <div className="rounded-2xl border border-white/10 bg-black/50 p-6 md:p-8">
           <h2 className="text-2xl font-semibold mb-4 text-amber-300">How Staking Works</h2>
+
           <ol className="list-decimal pl-5 space-y-3 text-white/80 leading-relaxed">
             <li>
-              Choose a lock term from <strong>1–30 days</strong>. Longer locks earn higher APR within the posted range.
+              Choose a lock term from <strong>1–30 days</strong>. Longer locks earn higher APR within posted bounds.
             </li>
             <li>
-              At maturity, <strong>Withdraw</strong> your principal + rewards or <strong>Compound</strong> to restart
-              your stake with boosted balance.
+              At maturity you can <strong>Withdraw</strong> your principal + vested rewards, or <strong>Compound</strong> to
+              roll rewards into principal and restart your chosen term.
             </li>
             <li>
-              <strong>Daily Manual Compounding</strong> available once every 24h for active stakers.{' '}
-              <em>Auto-Compound</em> can also be toggled on each vault to automatically reinvest every 48h.
+              <strong>Manual Compound</strong> is allowed once every 24h.{' '}
+              <em>Each compound restarts the term.</em>
             </li>
             <li>
-              Exiting early applies a <strong>decaying penalty</strong> to principal and forfeits unvested rewards —
-              protecting long-term participants and reinforcing the vault’s sustainability.
+              <strong>Auto-Compound</strong> can be toggled per vault. While enabled, the protocol compounds on its cadence and{' '}
+              <em>each auto-compound restarts the term</em>. You can turn it off anytime in{' '}
+              <Link href="/positions" className="underline text-amber-300">Vaults</Link>.
             </li>
             <li>
-              Every compound and withdrawal contributes a small fee directly back to the <strong>Vault TVL</strong>,
-              compounding community growth.
+              Exiting early triggers a decaying <strong>Early Exit Penalty</strong> on principal and forfeits unvested rewards.
+              This protects long-term stakers and vault health.
+            </li>
+            <li>
+              Protocol fees on withdraw/compound flow back to reinforce the BGLD vault over time.
             </li>
           </ol>
 
           <div className="mt-5 rounded-xl border border-amber-300/20 bg-amber-300/5 p-4 text-sm text-amber-200">
-            <p className="font-semibold mb-1">Gold Logic · Clear Math</p>
+            <p className="font-semibold mb-1">Clarity First</p>
             <p>
-              Rewards vest continuously over the term. Compounding resets the timer and increases your Gold stake. 
-              Vault health scales with time, not hype — and that’s what gives Base Gold its strength.
+              Rewards vest continuously over your selected term. Compounding adds vested rewards to principal and
+              <em> restarts</em> the lock. At maturity you decide: withdraw, or compound to keep growing.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Bullish Launch Block */}
-      <section className="px-6 pb-20 flex justify-center">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="max-w-3xl w-full bg-black/70 backdrop-blur-md border border-amber-300/40 rounded-2xl p-6 md:p-8 text-center shadow-lg"
-        >
-          <h2 className="text-2xl font-semibold text-amber-300 mb-2">🔥 The Gold Era Has Begun</h2>
-          <p className="text-white/80 leading-relaxed">
-            <span className="text-amber-300 font-semibold">Base Gold</span> is the first true on-chain Gold Vault — 
-            a DeFi primitive designed to last decades, not seasons. Once live, staking and compounding will shape 
-            the vault’s yield dynamics forever.
-          </p>
-          <p className="mt-3 text-white/70">
-            Early stakers earn the highest APYs ever posted by Base Gold.
-            Vault seeding is live — public staking opens soon.
-          </p>
+      {/* Why Base Gold (bullish) */}
+      <section className="px-6 pb-24 max-w-6xl mx-auto">
+        <div className="grid gap-6 md:grid-cols-3">
+          <FeatureCard
+            title="Onchain Gold Vault"
+            desc="Simple terms, transparent math. TVL and performance visible onchain—anytime."
+          />
+          <FeatureCard
+            title="Compounding Engine"
+            desc="Manual or auto. Compounding rolls rewards into principal to accelerate growth."
+          />
+          <FeatureCard
+            title="Built on Base"
+            desc="Low fees, fast finality, and a thriving ecosystem—perfect for everyday staking."
+          />
+        </div>
 
-          <div className="mt-6 animate-pulseGold text-amber-300 font-semibold text-sm uppercase tracking-wide">
-            #StakeYourGold · #BaseGold · #VaultSeedingLive
-          </div>
-
-          <div className="mt-8">
-            <Link
-              href="/stake"
-              className="inline-block px-6 py-3 bg-amber-300 text-black rounded-xl font-semibold hover:bg-[#f1d371] transition"
-            >
-              Enter the Vault
-            </Link>
-          </div>
-        </motion.div>
-      </section>
-
-      {/* Risk Disclosure */}
-      <section className="px-6 pb-24 max-w-5xl mx-auto">
-        <div className="rounded-2xl border border-white/10 bg-black/50 p-6 md:p-8">
+        {/* Risk disclosure */}
+        <div className="mt-8 rounded-2xl border border-white/10 bg-black/50 p-6 md:p-8">
           <h3 className="text-xl font-semibold text-white mb-3">Risk & Responsibility</h3>
           <p className="text-white/70 leading-relaxed">
-            Staking involves smart-contract and market risk. APRs are not guaranteed and can adjust within posted
-            bounds. Only stake what you can afford to lock. Read the{' '}
-            <Link href="/terms" className="underline text-amber-300">
-              Terms
-            </Link>
-            .
+            Staking involves smart-contract and market risk. APRs can change via governance/parameters within posted
+            bounds and are not guaranteed. Only stake what you can afford to lock. Read the{' '}
+            <Link href="/terms" className="underline text-amber-300">Terms</Link>.
           </p>
         </div>
       </section>
     </main>
+  );
+}
+
+function FeatureCard({ title, desc }: { title: string; desc: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/50 p-6">
+      <div className="text-lg font-semibold text-amber-300">{title}</div>
+      <p className="mt-2 text-white/80">{desc}</p>
+    </div>
   );
 }

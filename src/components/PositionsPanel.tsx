@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   useAccount,
   usePublicClient,
@@ -11,10 +11,11 @@ import {
 import { formatUnits } from 'viem';
 
 import STAKING_ABI from '@/lib/abis/BaseGoldStaking';
-import ERC20_ABI from '@/lib/abis/ERC20'; // (unused here but fine to keep if you want to show token labels elsewhere)
+import ERC20_ABI from '@/lib/abis/ERC20';
 import { BGLD_DECIMALS, BGLD_SYMBOL, aprForDays } from '@/lib/constants';
 
-const STAKING = (process.env.NEXT_PUBLIC_STAKING_ADDRESS || '').toLowerCase() as `0x${string}`;
+const TOKEN   = (process.env.NEXT_PUBLIC_BGLD_ADDRESS    || '').toLowerCase() as `0x${string}` | '';
+const STAKING = (process.env.NEXT_PUBLIC_STAKING_ADDRESS || '').toLowerCase() as `0x${string}` | '';
 
 type Position = {
   id: bigint;
@@ -26,24 +27,6 @@ type Position = {
   closed: boolean;
 };
 
-function abiHasSetAutoCompound(abi: unknown) {
-  try {
-    const arr = abi as ReadonlyArray<any>;
-    return !!arr.find(
-      (f) =>
-        f?.type === 'function' &&
-        f?.name === 'setAutoCompound' &&
-        Array.isArray(f?.inputs) &&
-        f.inputs.length === 2 &&
-        f.inputs[0]?.type?.startsWith('uint') &&
-        f.inputs[1]?.type === 'bool'
-    );
-  } catch {
-    return false;
-  }
-}
-const HAS_SET_AUTOCOMPOUND = abiHasSetAutoCompound(STAKING_ABI);
-
 export default function PositionsPanel() {
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -51,15 +34,23 @@ export default function PositionsPanel() {
 
   const [status, setStatus] = useState<string>('');
   const [busyId, setBusyId] = useState<bigint | null>(null);
-  const [togglingId, setTogglingId] = useState<bigint | null>(null);
+
+  // 0) Optional: vault BGLD (for context)
+  const { data: vaultBal = 0n } = useReadContract({
+    abi: ERC20_ABI,
+    address: (TOKEN || undefined),
+    functionName: 'balanceOf',
+    args: STAKING ? [STAKING] : undefined,
+    query: { enabled: Boolean(TOKEN && STAKING) },
+  });
 
   // 1) ids for this user
   const { data: idsData, refetch: refetchIds } = useReadContract({
     abi: STAKING_ABI,
-    address: STAKING,
+    address: STAKING || undefined,
     functionName: 'positionsOf',
     args: address ? [address] : undefined,
-    query: { enabled: !!address && !!STAKING },
+    query: { enabled: Boolean(address && STAKING) },
   });
 
   const ids = useMemo<bigint[]>(
@@ -69,13 +60,13 @@ export default function PositionsPanel() {
 
   // 2) batch read positions, pending rewards, exit fee
   const reads = useMemo(() => {
-    if (!ids.length) return [];
+    if (!ids.length || !STAKING) return [];
     const calls: any[] = [];
     for (const id of ids) {
       calls.push(
-        { abi: STAKING_ABI, address: STAKING, functionName: 'positions', args: [id] as const },
-        { abi: STAKING_ABI, address: STAKING, functionName: 'pendingRewards', args: [id] as const },
-        { abi: STAKING_ABI, address: STAKING, functionName: 'principalExitFeeBps', args: [id] as const },
+        { abi: STAKING_ABI, address: STAKING, functionName: 'positions', args: [id] },
+        { abi: STAKING_ABI, address: STAKING, functionName: 'pendingRewards', args: [id] },
+        { abi: STAKING_ABI, address: STAKING, functionName: 'principalExitFeeBps', args: [id] },
       );
     }
     return calls;
@@ -87,6 +78,7 @@ export default function PositionsPanel() {
     query: { enabled: reads.length > 0 },
   });
 
+  // 3) Normalize rows
   const rows = useMemo(() => {
     if (!ids.length) return [];
     const result: Array<{
@@ -95,6 +87,10 @@ export default function PositionsPanel() {
       vested: bigint;
       totalRewards: bigint;
       exitFeeBps: bigint;
+      elapsed: number;
+      termSecs: number;
+      mature: boolean;
+      apr: number;
     }> = [];
 
     let i = 0;
@@ -117,34 +113,81 @@ export default function PositionsPanel() {
       const totalRewards = rewRaw?.[1] ?? 0n;
       const exitFeeBps = feeRaw ?? 0n;
 
-      result.push({ id, pos, vested, totalRewards, exitFeeBps });
+      const now = Math.floor(Date.now() / 1000);
+      const elapsed = Math.max(0, now - Number(pos.start || 0n));
+      const termSecs = Math.max(0, pos.daysLocked * 86400);
+      const mature = elapsed >= termSecs;
+      const apr = aprForDays(pos.daysLocked);
+
+      result.push({ id, pos, vested, totalRewards, exitFeeBps, elapsed, termSecs, mature, apr });
     }
 
     // newest first
     return result.sort((a, b) => Number(b.id - a.id));
   }, [ids, batchData]);
 
+  // 4) Aggregated summary metrics (per-account)
+  const summary = useMemo(() => {
+    if (!rows.length) {
+      return {
+        totalPrincipal: 0n,
+        totalVested: 0n,
+        totalRewards: 0n,
+        activeCount: 0,
+        soonestMaturity: undefined as number | undefined,
+        avgApr: undefined as number | undefined,
+      };
+    }
+    let totalPrincipal = 0n;
+    let totalVested = 0n;
+    let totalRewards = 0n;
+    let activeCount = 0;
+    let aprSum = 0;
+    let aprCount = 0;
+    let soonest: number | undefined;
+
+    for (const r of rows) {
+      if (!r.pos.closed) {
+        activeCount++;
+        totalPrincipal += r.pos.amount;
+        totalVested += r.vested;
+        totalRewards += r.totalRewards;
+        aprSum += r.apr;
+        aprCount++;
+        const remaining = Math.max(0, r.termSecs - r.elapsed);
+        if (soonest === undefined || remaining < soonest) soonest = remaining;
+      }
+    }
+    return {
+      totalPrincipal,
+      totalVested,
+      totalRewards,
+      activeCount,
+      soonestMaturity: soonest,
+      avgApr: aprCount ? Math.round((aprSum / aprCount) * 100) / 100 : undefined,
+    };
+  }, [rows]);
+
+  // helpers
   const refetchAll = async () => {
     await Promise.all([refetchIds(), refetchBatch()]);
   };
 
-  // --- core actions ---
-  async function perform(
-    id: bigint,
-    req: { fn: 'withdraw' | 'emergencyExit' | 'compound' }
-  ) {
+  async function perform(id: bigint, req: { fn: 'withdraw' | 'emergencyExit' | 'compound' }) {
     try {
       setBusyId(id);
       setStatus('');
       const base = {
-        abi: STAKING_ABI as unknown as readonly unknown[],
-        address: STAKING,
+        abi: STAKING_ABI as any,
+        address: STAKING!,
         functionName: req.fn,
         args: [id] as const,
       };
 
+      // simulate first for clear reverts
       await publicClient!.simulateContract({ ...base, account: address! });
-      const hash = await writeContractAsync({ ...base });
+
+      const hash = await writeContractAsync(base);
       setStatus(`${req.fn} submitted: ${hash.slice(0, 10)}…`);
       await publicClient!.waitForTransactionReceipt({ hash });
       await refetchAll();
@@ -162,38 +205,6 @@ export default function PositionsPanel() {
     }
   }
 
-  async function toggleAutoCompound(id: bigint, next: boolean) {
-    if (!HAS_SET_AUTOCOMPOUND) return;
-    try {
-      setTogglingId(id);
-      setStatus('');
-
-      const base = {
-        abi: STAKING_ABI as unknown as readonly unknown[],
-        address: STAKING,
-        functionName: 'setAutoCompound',
-        args: [id, next] as const,
-      };
-
-      await publicClient!.simulateContract({ ...base, account: address! });
-      const hash = await writeContractAsync({ ...base });
-      setStatus(`setAutoCompound submitted: ${hash.slice(0, 10)}…`);
-      await publicClient!.waitForTransactionReceipt({ hash });
-      await refetchAll();
-      setStatus(`Auto-compound ${next ? 'enabled' : 'disabled'} ✓`);
-    } catch (e: any) {
-      const msg =
-        e?.reason ||
-        e?.metaMessages?.join('\n') ||
-        e?.shortMessage ||
-        e?.message ||
-        'setAutoCompound failed';
-      setStatus(msg);
-    } finally {
-      setTogglingId(null);
-    }
-  }
-
   if (!address) {
     return (
       <div className="rounded-2xl border border-white/10 bg-black/40 p-5 text-sm text-white/70">
@@ -204,84 +215,93 @@ export default function PositionsPanel() {
 
   return (
     <div className="rounded-2xl border border-white/10 bg-black/40 p-4 sm:p-5">
-      <div className="mb-3 text-sm font-semibold text-amber-300">Your Vaults</div>
+      {/* Summary strip */}
+      <div className="mb-4">
+        <div className="mb-2 text-sm font-semibold text-amber-300">Your Vaults — Overview</div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <KV
+            label="Total Principal"
+            value={`${fmtToken(summary.totalPrincipal, BGLD_DECIMALS, 2)} ${BGLD_SYMBOL}`}
+          />
+          <KV
+            label="Vested Now"
+            value={`${fmtToken(summary.totalVested, BGLD_DECIMALS, 2)} ${BGLD_SYMBOL}`}
+          />
+          <KV
+            label="Rewards @ Maturity"
+            value={`${fmtToken(summary.totalRewards, BGLD_DECIMALS, 2)} ${BGLD_SYMBOL}`}
+          />
+          <KV label="Active Vaults" value={String(summary.activeCount)} />
+          <KV
+            label="Soonest Maturity"
+            value={summary.soonestMaturity !== undefined ? formatDuration(summary.soonestMaturity) : '—'}
+          />
+          <KV
+            label="Avg APR"
+            value={summary.avgApr !== undefined ? `${summary.avgApr}%` : '—'}
+          />
+        </div>
+
+        {/* Optional: show current vault BGLD for transparency */}
+        <div className="mt-2 text-[11px] text-white/40">
+          Vault balance (BGLD): <span className="text-amber-200">{fmtToken(vaultBal, BGLD_DECIMALS, 2)}</span>
+        </div>
+      </div>
+
+      <div className="mb-3 text-sm font-semibold text-amber-300">Your Individual Vaults</div>
 
       {rows.length === 0 && (
         <div className="text-sm text-white/60">No active vaults yet.</div>
       )}
 
       <div className="space-y-4">
-        {rows.map(({ id, pos, vested, totalRewards, exitFeeBps }) => {
-          const now = Math.floor(Date.now() / 1000);
-          const elapsed = Math.max(0, now - Number(pos.start));
-          const termSecs = pos.daysLocked * 86400;
-          const mature = elapsed >= termSecs;
-
-          const apr = aprForDays(pos.daysLocked);
-          const principal = pos.amount;
+        {rows.map(({ id, pos, vested, totalRewards, exitFeeBps, elapsed, termSecs, mature, apr }) => {
+          const principalFmt = fmtToken(pos.amount, BGLD_DECIMALS, 2);
           const vestedFmt = fmtToken(vested, BGLD_DECIMALS, 2);
           const rewardsFmt = fmtToken(totalRewards, BGLD_DECIMALS, 2);
-          const principalFmt = fmtToken(principal, BGLD_DECIMALS, 2);
-
+          const maturedIn = mature ? 'Mature' : formatDuration(termSecs - elapsed);
           const exitFee = (Number(exitFeeBps) / 100).toFixed(2) + '%';
-          const maturedIn =
-            mature ? 'Mature' : formatDuration(termSecs - elapsed);
 
           return (
             <div key={String(id)} className="rounded-xl border border-white/10 bg-black/30 p-4">
-              {/* Top row: ID + actions (no bleeding) */}
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+              {/* Top row: ID + action buttons */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-xs uppercase tracking-widest text-white/60">Vault ID</div>
                   <div className="text-lg font-semibold text-amber-300">#{id.toString()}</div>
-                  <div className="mt-1 text-xs text-white/50">
-                    {pos.autoCompound ? 'Auto-compound: ON' : 'Auto-compound: OFF'}
+                  <div className="text-xs text-white/50 mt-1">
+                    Auto-Compound: <span className="text-amber-200">{pos.autoCompound ? 'On' : 'Off'}</span>
                   </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  {HAS_SET_AUTOCOMPOUND && (
-                    <button
-                      onClick={() => toggleAutoCompound(id, !pos.autoCompound)}
-                      disabled={togglingId === id}
-                      className="min-w-[9.5rem] rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm font-semibold text-white/80 hover:bg-white/5 whitespace-nowrap"
-                    >
-                      {togglingId === id
-                        ? 'Updating…'
-                        : pos.autoCompound
-                        ? 'Disable Auto-Compound'
-                        : 'Enable Auto-Compound'}
-                    </button>
-                  )}
-
                   <button
                     onClick={() => perform(id, { fn: 'compound' })}
                     disabled={busyId === id}
-                    className="min-w-[8.75rem] rounded-lg bg-gold px-3 py-2 text-sm font-semibold text-black hover:bg-[#e6c964] whitespace-nowrap"
+                    className="min-w-[9.5rem] rounded-lg bg-amber-300 px-3 py-2 text-sm font-semibold text-black hover:bg-[#e6c964] whitespace-nowrap"
                   >
                     {busyId === id ? 'Working…' : 'Compound'}
                   </button>
-
                   <button
                     onClick={() => perform(id, { fn: 'withdraw' })}
                     disabled={!mature || busyId === id}
-                    className={`min-w-[8.75rem] rounded-lg px-3 py-2 text-sm font-semibold whitespace-nowrap
-                      ${mature ? 'bg-gold text-black hover:bg-[#e6c964]' : 'bg-white/10 text-white/50 cursor-not-allowed'}`}
+                    className={`min-w-[9.5rem] rounded-lg px-3 py-2 text-sm font-semibold whitespace-nowrap
+                      ${mature ? 'bg-amber-300 text-black hover:bg-[#e6c964]' : 'bg-white/10 text-white/50 cursor-not-allowed'}
+                    `}
                   >
                     Withdraw
                   </button>
-
                   <button
                     onClick={() => perform(id, { fn: 'emergencyExit' })}
                     disabled={busyId === id}
-                    className="min-w-[9.25rem] rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-200 hover:bg-red-500/20 whitespace-nowrap"
+                    className="min-w-[9.5rem] rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-200 hover:bg-red-500/20 whitespace-nowrap"
                   >
                     Emergency Exit
                   </button>
                 </div>
               </div>
 
-              {/* Metrics grid (tight, non-bleeding) */}
+              {/* Metrics grid */}
               <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 <KV label="Principal" value={`${principalFmt} ${BGLD_SYMBOL}`} />
                 <KV label="Term" value={`${pos.daysLocked}d`} />
