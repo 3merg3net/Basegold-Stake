@@ -151,6 +151,28 @@ export default function StakeForm({ initialLockDays = 14 }: { initialLockDays?: 
         throw new Error('Unsupported stake() signature on this contract');
       }
 
+      // ---- TEMP DEBUG: expose the env the UI is actually using ----
+const CHAIN_ID_RAW = Number(process.env.NEXT_PUBLIC_CHAIN_ID || 0);
+const STAKING_ENABLED = (process.env.NEXT_PUBLIC_STAKING_ENABLED || '0') === '1';
+const DISABLE_FLAG    = (process.env.NEXT_PUBLIC_DISABLE_STAKING || '0') === '1';
+
+if (typeof window !== 'undefined') {
+  (window as any).__bgld_env = {
+    TOKEN,
+    STAKING,
+    CHAIN_ID: CHAIN_ID_RAW,
+    STAKING_ENABLED,
+    DISABLE_FLAG,
+  };
+  // one-time log to console so you can see it immediately
+  // (guard to avoid spamming on every render)
+  if (!(window as any).__bgld_env_logged) {
+    (window as any).__bgld_env_logged = true;
+    console.log('[BGLD env]', (window as any).__bgld_env);
+  }
+}
+
+
       // Pre-simulate to surface reverts clearly
       await publicClient!.simulateContract({
         abi: STAKING_ABI as unknown as readonly unknown[],
