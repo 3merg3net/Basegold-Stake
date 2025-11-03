@@ -1,41 +1,34 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
 import StakeForm from '@/components/StakeForm';
 
-export default function StakeClient() {
-  const sp = useSearchParams();
-  const initialLockDays = useMemo(() => {
-    const raw = sp.get('lock');
-    const n = raw ? Number(raw) : 14;
-    // clamp 1..30 and round
-    const clamped = Math.max(1, Math.min(30, Math.round(Number.isFinite(n) ? n : 14)));
-    return clamped;
-  }, [sp]);
+import VaultsPanel from '@/components/VaultsPanel';
 
+type Props = {
+  initialLockDays?: number;
+};
+
+export default function StakeClient({ initialLockDays = 7 }: Props) {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-black via-darkbg to-black text-white">
-      <section className="max-w-6xl mx-auto px-4 pt-12 pb-6 text-center">
-        <h1 className="text-4xl font-bold text-gold mb-2">Stake Your BGLD</h1>
-        <p className="text-gray-300 max-w-2xl mx-auto">
-          Choose your lock duration, approve the token, and stake into the vault. Rewards accrue in ETH and can be
-          compounded into BGLD automatically or manually from the home page.
-        </p>
-      </section>
-
-      <section className="max-w-3xl mx-auto px-4 pb-16">
+    <div className="space-y-10">
+      <section className="max-w-3xl mx-auto px-4 pb-6">
         <StakeForm initialLockDays={initialLockDays} />
       </section>
+      <section className="max-w-3xl mx-auto px-4 pb-4">
+  <h1 className="text-2xl font-semibold text-amber-200 mb-3">Stake BGLD</h1>
+  <p className="text-sm text-white/70 leading-relaxed mb-6">
+    Lock your BGLD tokens in a vault to earn daily rewards. 
+    Choose your staking duration — longer terms offer higher APRs.
+    Rewards automatically accrue every block and can be compounded or withdrawn anytime 
+    after your lock period ends.
+  </p>
+</section>
 
-      <section className="max-w-5xl mx-auto px-6 pb-24 border-t border-gold/20 text-center">
-        <h2 className="text-2xl font-semibold text-gold mb-3">How staking works</h2>
-        <p className="text-gray-300 leading-relaxed max-w-3xl mx-auto">
-          When you stake, your BGLD is deposited into the vault for the selected lock period.
-          ETH rewards are earned and routed back into BGLD on compounding cycles, increasing your vault share over time.
-          View positions, compounding activity, and receipts on Basescan for full transparency.
-        </p>
+
+      {/* Restore the working “Your Vaults” panel under the Stake form */}
+      <section className="max-w-5xl mx-auto px-4 pb-24">
+        <VaultsPanel />
       </section>
-    </main>
+    </div>
   );
 }
