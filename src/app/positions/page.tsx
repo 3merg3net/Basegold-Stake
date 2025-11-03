@@ -1,4 +1,4 @@
-import PositionsPanel from '@/components/PositionsPanel';
+import VaultsPanel from '@/components/VaultsPanel';
 
 export const dynamic = 'force-static';
 
@@ -28,7 +28,7 @@ export default function VaultsPage() {
       </div>
 
       {/* Identical look and functionality to Stake page */}
-      <PositionsPanel />
+      <VaultsPanel />
     </main>
   );
 }

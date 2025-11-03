@@ -2,7 +2,7 @@
 
 import StakeForm from '@/components/StakeForm';
 
-import PositionsPanel from '@/components/PositionsPanel';
+import VaultsPanel from '@/components/VaultsPanel';
 
 type Props = {
   initialLockDays?: number;
@@ -27,7 +27,7 @@ export default function StakeClient({ initialLockDays = 7 }: Props) {
 
       {/* Restore the working “Your Vaults” panel under the Stake form */}
       <section className="max-w-5xl mx-auto px-4 pb-24">
-        <PositionsPanel />
+        <VaultsPanel />
       </section>
     </div>
   );
