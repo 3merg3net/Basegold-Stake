@@ -177,9 +177,7 @@ export default function VaultsPanel({ className }: { className?: string }) {
 
   const aprTermContracts = useMemo(() => {
     if (!enabled || idList.length === 0) return [];
-    // we need aprForDays & termSeconds for each position; we’ll use daysLocked from positions later,
-    // but to avoid two-stage fetch/flicker, we’ll call for a unique set of days once we know them.
-    // For simplicity & robustness across states, we also fetch for all 1..30 and index them (cheap calls).
+    // fetch aprForDays & termSeconds for 1..30 (cheap) and index them
     const c: any[] = [];
     for (let d = 1; d <= 30; d++) {
       c.push({
@@ -258,9 +256,7 @@ export default function VaultsPanel({ className }: { className?: string }) {
         | [string, bigint, bigint, bigint, number, boolean, boolean]
         | undefined;
 
-      const prTuple = posReads[i * 3 + 1]?.result as
-        | [bigint, bigint]
-        | undefined;
+      const prTuple = posReads[i * 3 + 1]?.result as [bigint, bigint] | undefined;
 
       const feeBps = posReads[i * 3 + 2]?.result as number | undefined;
 
@@ -268,8 +264,8 @@ export default function VaultsPanel({ className }: { className?: string }) {
 
       const owner = posTuple[0];
       const amount = posTuple[1];
-      const start = posTuple[2]; // uint64 -> returned as bigint
-      // const lastCompoundAt = posTuple[3]; // not used for now in UI
+      const start = posTuple[2]; // uint64 -> bigint
+      // const lastCompoundAt = posTuple[3]; // not used for now
       const daysLocked = posTuple[4];
       const autoCompound = posTuple[5];
       const closed = posTuple[6];
@@ -292,6 +288,19 @@ export default function VaultsPanel({ className }: { className?: string }) {
     // newest first
     return out.sort((a, b) => Number(b.id - a.id));
   }, [posReads, idList]);
+
+  // ✅ NEW: filter out closed or zero-amount vaults (keeps your UI/logic intact)
+  const visibleRows = useMemo(() => {
+    return rows.filter((r) => {
+      try {
+        const amt = (r as any).amount ?? 0n;
+        const closed = Boolean((r as any).closed);
+        return !closed && amt > 0n;
+      } catch {
+        return false;
+      }
+    });
+  }, [rows]);
 
   // actions
   const { writeContractAsync } = useWriteContract();
@@ -349,7 +358,7 @@ export default function VaultsPanel({ className }: { className?: string }) {
   return (
     <div className={className}>
       <div className="space-y-4">
-        {rows.map((r) => {
+        {visibleRows.map((r) => {
           const aprBps = aprByDays.get(r.daysLocked) ?? 0; // uint32 bps
           const termSec = termByDays.get(r.daysLocked) ?? 0n;
 
@@ -366,7 +375,8 @@ export default function VaultsPanel({ className }: { className?: string }) {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="text-sm text-white/60">Vault #{String(r.id)}</div>
                 <div className="text-xs text-white/50">
-                  Term: {r.daysLocked}d · APR: {(aprBps / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%
+                  Term: {r.daysLocked}d · APR:{' '}
+                  {(aprBps / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%
                 </div>
               </div>
 
