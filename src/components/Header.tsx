@@ -40,9 +40,7 @@ export default function Header() {
           <NavLink href="/">Home</NavLink>
           <NavLink href="/stake">Stake Claim</NavLink>
           <NavLink href="/positions">Vaults</NavLink>
-          <NavLink href="/claim">Claim Dashboard</NavLink>
           <NavLink href="/status">Status</NavLink>
-          <NavLink href="/how-to">How-to</NavLink>
           <NavLink href="/how-it-works">Mechanics</NavLink>
           <NavLink href="/terms">Terms</NavLink>
         </nav>
