@@ -5,6 +5,8 @@ import { useMemo, useState } from 'react';
 import { formatUnits, parseUnits } from 'viem';
 import { useAccount, useReadContracts, useWriteContract } from 'wagmi';
 import ERC20_ABI_RAW from '@/lib/abis/ERC20';
+import { useBgldPrice } from '@/hooks/useBgldPrice';
+
 
 // ---- Normalize ERC20 ABI (array or artifact) ----
 function normalizeAbi(mod: any) {
@@ -77,6 +79,8 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
   const [days, setDays] = useState<number>(clampDays(initialLockDays));
   const [autoCompound, setAutoCompound] = useState<boolean>(false);
   const [status, setStatus] = useState<string>('');
+  const priceUsd = useBgldPrice();
+
 
   // --- Reads: ERC20 (decimals, balance, allowance) + Pool (slot0/token0/token1) ---
   const { data: reads, refetch: refetchReads } = useReadContracts({
@@ -150,13 +154,15 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
     }
   }, [slot0, poolToken0, poolToken1]);
 
-  // --- USD hint for input amount ---
-  const estUsdHint = useMemo(() => {
-    const n = Number(amount);
-    if (!Number.isFinite(n) || n <= 0 || !bgldUsd) return '0.00';
-    const v = n * bgldUsd;
-    return v >= 1 ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : fmtSmall(v);
-  }, [amount, bgldUsd]);
+  const estUsdHint =
+  priceUsd && parsedAmount
+    ? (Number(formatUnits(parsedAmount, bgldDecimals)) * priceUsd).toLocaleString(undefined, {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 2,
+      })
+    : '—';
+
 
   const { writeContractAsync } = useWriteContract();
 
@@ -240,14 +246,20 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
           MAX
         </button>
       </div>
-      <div className="mt-1 text-xs text-white/50">
-        Est. USD: ${estUsdHint}
-        {bgldUsd ? (
-          <span className="ml-2 text-white/40">
-            (≈ ${fmtSmall(bgldUsd, 8)} / BGLD)
-          </span>
-        ) : null}
-      </div>
+      <div className="mt-1 text-xs text-white/50">Est. USD: {estUsdHint}</div>
+      {priceUsd ? (
+  <div className="mt-0.5 text-xs text-white/40">
+    Wallet: {formatUnits(walletBgld, bgldDecimals)} BGLD (
+    {(Number(formatUnits(walletBgld, bgldDecimals)) * priceUsd).toLocaleString(undefined, {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 2,
+    })}
+    )
+  </div>
+) : null}
+
+
 
       {/* days slider */}
       <div className="mt-6">
