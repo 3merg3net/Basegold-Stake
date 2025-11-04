@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+import WalletChip from '@/components/WalletChip';
 
 export default function Header() {
   const [open, setOpen] = useState(false);
@@ -60,6 +61,7 @@ export default function Header() {
             <path d="M4 7h16M4 12h16M4 17h16" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
         </button>
+        <WalletChip />
       </div>
 
       {/* Mobile Drawer (opaque, no blur) */}

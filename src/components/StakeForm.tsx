@@ -101,6 +101,11 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
   const bgldDecimals = (reads?.[0]?.result as number | undefined) ?? 18;
   const walletBgld   = (reads?.[1]?.result as bigint | undefined) ?? 0n;
   const allowance    = (reads?.[2]?.result as bigint | undefined) ?? 0n;
+  const walletBgldNum = Number(formatUnits(walletBgld, bgldDecimals));
+const walletDisplay = Number.isFinite(walletBgldNum)
+  ? walletBgldNum.toLocaleString(undefined, { maximumFractionDigits: 2 })
+  : '0.00';
+
 
   const slot0      = reads?.[3]?.result as any | undefined;
   const poolToken0 = (reads?.[4]?.result as `0x${string}` | undefined)?.toLowerCase();
@@ -276,6 +281,10 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
           onChange={(e) => setDays(clampDays(Number(e.target.value)))}
           className="w-full"
         />
+        <div className="mt-1 text-xs text-white/60">
+  Wallet: {walletDisplay} BGLD
+</div>
+
       </div>
 
       {/* auto-compound */}
