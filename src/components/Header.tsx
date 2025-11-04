@@ -102,9 +102,7 @@ export default function Header() {
             ['/', 'Home'],
             ['/stake', 'Stake'],
             ['/positions', 'Vaults'],
-            ['/claim', 'Claim Dashboard'],
             ['/status', 'Status'],
-            ['/how-to', 'How-to'],
             ['/how-it-works', 'Mechanics'],
             ['/terms', 'Terms'],
           ].map(([href, label]) => (
