@@ -4,6 +4,8 @@
 import { useEffect, useMemo } from 'react';
 import { useAccount, useReadContracts, useWriteContract } from 'wagmi';
 import { formatUnits } from 'viem';
+import { useBgldPrice } from '@/hooks/useBgldPrice';
+
 
 // --- ENV ---
 const env = {
@@ -114,6 +116,11 @@ function fmtBgld(v: bigint | undefined, decimals = 18, digits = 4) {
   const num = Number(formatUnits(v, decimals));
   return fmtNum(num, digits);
 }
+function moneyFmt(n?: number, digits = 2) {
+  if (!Number.isFinite(n!)) return '—';
+  return n!.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: digits });
+}
+
 function toNumber(bi?: bigint) {
   if (bi == null) return undefined;
   return Number(bi);
@@ -129,6 +136,14 @@ function secsToDHMS(secsNum: number) {
 export default function VaultsPanel({ className }: { className?: string }) {
   const { address, chainId } = useAccount();
   const enabled = Boolean(address && env.STAKING);
+
+  const priceUsd = useBgldPrice();
+const toUsd = (bgld: bigint, decimals = 18) => {
+  if (!priceUsd) return undefined;
+  const num = Number(formatUnits(bgld, decimals));
+  return num * priceUsd;
+};
+
 
   // 1) fetch IDs
   const { data: idsData, refetch: refetchIds } = useReadContracts({
@@ -381,9 +396,30 @@ export default function VaultsPanel({ className }: { className?: string }) {
               </div>
 
               <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Metric label="Principal" value={`${fmtBgld(r.amount, 18, 4)} BGLD`} />
-                <Metric label="Vested Rewards" value={`${fmtBgld(r.vested, 18, 4)} BGLD`} />
-                <Metric label="Total Rewards" value={`${fmtBgld(r.total, 18, 4)} BGLD`} />
+                <Metric
+  label="Principal"
+  value={
+    `${fmtBgld(r.amount, 18, 4)} BGLD` +
+    (priceUsd ? ` · ${moneyFmt(toUsd(r.amount)!, 2)}` : '')
+  }
+/>
+
+<Metric
+  label="Vested Rewards"
+  value={
+    `${fmtBgld(r.vested, 18, 4)} BGLD` +
+    (priceUsd ? ` · ${moneyFmt(toUsd(r.vested)!, 2)}` : '')
+  }
+/>
+
+<Metric
+  label="Total Rewards"
+  value={
+    `${fmtBgld(r.total, 18, 4)} BGLD` +
+    (priceUsd ? ` · ${moneyFmt(toUsd(r.total)!, 2)}` : '')
+  }
+/>
+
                 <Metric label="Exit Fee (now)" value={`${(r.exitFeeBps / 100).toFixed(2)}%`} />
                 <Metric label="Started" value={new Date(Number(r.start) * 1000).toLocaleString()} />
                 <Metric label="Ends" value={new Date(Number(end) * 1000).toLocaleString()} />

@@ -17,7 +17,7 @@ export default function VaultsPage() {
         <p>
           Use the <span className="text-amber-300 font-medium">Compound</span> button 
           to add your pending rewards back into the vault, 
-          <span className="text-cyan-300 font-medium">Withdraw</span> when your term ends, 
+          <span className="text-emerald-300 font-medium">Withdraw</span> when your term ends, 
           or <span className="text-rose-400 font-medium">Emergency Exit</span> if you need 
           early access (fees apply).
         </p>
