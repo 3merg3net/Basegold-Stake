@@ -24,7 +24,7 @@ export default function Header() {
         style={{ background: 'linear-gradient(90deg,transparent,rgba(212,175,55,.7),transparent)' }}
       />
 
-      <div className="relative mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+      <div className="relative mx-auto flex max-w-6xl items-center justify-between px-4 py-3 gap-3">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-3">
           <span className="relative block h-12 w-12 md:h-14 md:w-14">
@@ -46,44 +46,51 @@ export default function Header() {
           <NavLink href="/terms">Terms</NavLink>
         </nav>
 
-        {/* Connect (desktop) */}
-        <div className="hidden md:block">
-          <ConnectButton />
-        </div>
+        {/* Right cluster: WalletChip + Connect + Hamburger */}
+        <div className="ml-auto flex items-center gap-3">
+          {/* Always visible Wallet chip */}
+          <WalletChip />
 
-        {/* Mobile menu button */}
-        <button
-          aria-label="Open menu"
-          onClick={() => setOpen(true)}
-          className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/10"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <path d="M4 7h16M4 12h16M4 17h16" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        </button>
-        <WalletChip />
+          {/* Always visible Connect (moved out of drawer; on all breakpoints) */}
+          <div className="shrink-0">
+            <ConnectButton
+              chainStatus="icon"
+              accountStatus={{ smallScreen: 'avatar', largeScreen: 'full' }}
+              showBalance={false}
+            />
+          </div>
+
+          {/* Mobile menu button (opens links only) */}
+          <button
+            aria-label="Open menu"
+            onClick={() => setOpen(true)}
+            className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/10"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M4 7h16M4 12h16M4 17h16" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
       </div>
 
-      {/* Mobile Drawer (opaque, no blur) */}
+      {/* Mobile Drawer (links only — NO Connect here) */}
       <div
         className={`fixed inset-y-0 right-0 z-[60] w-72 transform transition-transform duration-300 md:hidden border-l border-white/10 shadow-2xl
         ${open ? 'translate-x-0' : 'translate-x-full'}
         bg-black/95`}
-        // hard fallback in case a global style overrides classes
         style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
       >
         {/* Drawer header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 text-white">
           <div className="flex items-center gap-3">
             <span className="relative block h-10 w-10">
-             <Image
-  src="/logo.png"
-  alt="Base Gold"
-  fill
-  sizes="(max-width: 640px) 64px, 80px"   // <- add this line
-  className="object-contain transition-transform duration-300 group-hover:scale-110 drop-shadow-[0_0_8px_rgba(212,175,55,0.6)]"
-/>
-
+              <Image
+                src="/logo.png"
+                alt="Base Gold"
+                fill
+                sizes="(max-width: 640px) 64px, 80px"
+                className="object-contain transition-transform duration-300 group-hover:scale-110 drop-shadow-[0_0_8px_rgba(212,175,55,0.6)]"
+              />
             </span>
             <span className="font-semibold text-amber-300">BASE GOLD</span>
           </div>
@@ -98,7 +105,7 @@ export default function Header() {
           </button>
         </div>
 
-        {/* Drawer links */}
+        {/* Drawer links (no Connect here) */}
         <nav className="flex flex-col px-4 py-3 text-white/90">
           {[
             ['/', 'Home'],
@@ -117,10 +124,6 @@ export default function Header() {
               {label}
             </Link>
           ))}
-
-          <div className="px-1 pt-4">
-            <ConnectButton />
-          </div>
         </nav>
       </div>
 

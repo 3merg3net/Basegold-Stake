@@ -1,4 +1,3 @@
-// src/components/StakeForm.tsx
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -6,7 +5,6 @@ import { formatUnits, parseUnits } from 'viem';
 import { useAccount, useReadContracts, useWriteContract } from 'wagmi';
 import ERC20_ABI_RAW from '@/lib/abis/ERC20';
 import { useBgldPrice } from '@/hooks/useBgldPrice';
-
 
 // ---- Normalize ERC20 ABI (array or artifact) ----
 function normalizeAbi(mod: any) {
@@ -17,7 +15,7 @@ function normalizeAbi(mod: any) {
 }
 const ERC20_ABI = normalizeAbi(ERC20_ABI_RAW);
 
-// ---- Minimal inline ABI for staking call only (unchanged) ----
+// ---- Minimal inline ABI for staking call only ----
 const STAKING_STUB_ABI = [
   {
     type: 'function',
@@ -32,7 +30,7 @@ const STAKING_STUB_ABI = [
   },
 ] as const;
 
-// ---- Minimal Uniswap V3 Pool ABI (for price) ----
+// (kept for compatibility with your reads list)
 const UNIV3_POOL_ABI = [
   { type: 'function', name: 'slot0', stateMutability: 'view', inputs: [], outputs: [
     { name: 'sqrtPriceX96', type: 'uint160' },
@@ -58,7 +56,7 @@ const env = {
   POOL: (process.env.NEXT_PUBLIC_UNIV3_POOL || '').trim().toLowerCase(),
   WETH: (process.env.NEXT_PUBLIC_WETH_ADDRESS || '').trim().toLowerCase(),
   CHAIN_ID: Number(process.env.NEXT_PUBLIC_CHAIN_ID || '8453'),
-  STAKING_ENABLED: (process.env.NEXT_PUBLIC_STAKING_ENABLED ?? '1') !== '0', // default ON
+  STAKING_ENABLED: (process.env.NEXT_PUBLIC_STAKING_ENABLED ?? process.env.NEXT_PUBLIC_DISABLE_STAKING ?? '0') === '0', // ON unless explicitly disabled
   ETH_USD_OVERRIDE: (process.env.NEXT_PUBLIC_ETH_USD_OVERRIDE || '').trim(),
 };
 
@@ -66,10 +64,21 @@ function clampDays(v: number) {
   if (!Number.isFinite(v)) return 7;
   return Math.max(1, Math.min(30, Math.floor(v)));
 }
-function fmtSmall(n?: number, digits = 6) {
+function fmtNum(n?: number, digits = 2) {
   if (!Number.isFinite(n!)) return '—';
-  if (Math.abs(n!) >= 1) return n!.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  return Number(n!).toPrecision(digits);
+  return n!.toLocaleString(undefined, { maximumFractionDigits: digits });
+}
+function fmtUsd(n?: number) {
+  if (!Number.isFinite(n!)) return '—';
+  return n!.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+}
+
+// --- APR curve used across app (matches calculator) ---
+function getAPR(days: number): number {
+  if (days <= 5) return 10 + (days - 1) * 7.5;      // 10–40%
+  if (days <= 14) return 100 + (days - 6) * 25;     // 100–300%
+  const extra = Math.max(0, days - 15);             // 15–30 → 400–1200%
+  return 400 + extra * 53.3;
 }
 
 export default function StakeForm({ className, initialLockDays = 7 }: Props) {
@@ -79,8 +88,9 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
   const [days, setDays] = useState<number>(clampDays(initialLockDays));
   const [autoCompound, setAutoCompound] = useState<boolean>(false);
   const [status, setStatus] = useState<string>('');
-  const priceUsd = useBgldPrice();
 
+  // Live BGLD/USD via your hook (backed by /api/gold using Dexscreener)
+  const priceUsd = useBgldPrice();
 
   // --- Reads: ERC20 (decimals, balance, allowance) + Pool (slot0/token0/token1) ---
   const { data: reads, refetch: refetchReads } = useReadContracts({
@@ -91,7 +101,7 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
       address ? { abi: ERC20_ABI as any, address: env.BGLD as `0x${string}`, functionName: 'balanceOf', args: [address as `0x${string}`] } : undefined,
       address ? { abi: ERC20_ABI as any, address: env.BGLD as `0x${string}`, functionName: 'allowance', args: [address as `0x${string}`, env.STAKING as `0x${string}`] } : undefined,
 
-      // Pool price
+      // (kept for compatibility)
       env.POOL ? { abi: UNIV3_POOL_ABI as any, address: env.POOL as `0x${string}`, functionName: 'slot0' } : undefined,
       env.POOL ? { abi: UNIV3_POOL_ABI as any, address: env.POOL as `0x${string}`, functionName: 'token0' } : undefined,
       env.POOL ? { abi: UNIV3_POOL_ABI as any, address: env.POOL as `0x${string}`, functionName: 'token1' } : undefined,
@@ -101,15 +111,11 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
   const bgldDecimals = (reads?.[0]?.result as number | undefined) ?? 18;
   const walletBgld   = (reads?.[1]?.result as bigint | undefined) ?? 0n;
   const allowance    = (reads?.[2]?.result as bigint | undefined) ?? 0n;
+
   const walletBgldNum = Number(formatUnits(walletBgld, bgldDecimals));
-const walletDisplay = Number.isFinite(walletBgldNum)
-  ? walletBgldNum.toLocaleString(undefined, { maximumFractionDigits: 2 })
-  : '0.00';
-
-
-  const slot0      = reads?.[3]?.result as any | undefined;
-  const poolToken0 = (reads?.[4]?.result as `0x${string}` | undefined)?.toLowerCase();
-  const poolToken1 = (reads?.[5]?.result as `0x${string}` | undefined)?.toLowerCase();
+  const walletDisplay = Number.isFinite(walletBgldNum)
+    ? walletBgldNum.toLocaleString(undefined, { maximumFractionDigits: 2 })
+    : '0.00';
 
   // --- Parse amount -> wei ---
   const parsedAmount: bigint | undefined = useMemo(() => {
@@ -125,49 +131,33 @@ const walletDisplay = Number.isFinite(walletBgldNum)
     return allowance < parsedAmount;
   }, [allowance, parsedAmount]);
 
-  // --- Network gate (unchanged) ---
+  // --- Network gate ---
   const wrongNetwork = useMemo(() => {
     return Boolean(chainId && env.CHAIN_ID && chainId !== env.CHAIN_ID);
   }, [chainId]);
 
-  // --- Price calc (float UI only) ---
-  const { ethPerBgld, bgldUsd } = useMemo(() => {
-    try {
-      if (!slot0 || !poolToken0 || !poolToken1 || !env.WETH || !env.BGLD) return { ethPerBgld: undefined, bgldUsd: undefined };
+  // --- APR + reward previews (UI-only estimate) ---
+  const apr = useMemo(() => getAPR(days), [days]);
 
-      const sqrtPriceX96 = slot0[0] as bigint;
-      const s = Number(sqrtPriceX96); // UI float (precision loss ok)
-      const q = 2 ** 96;
-      const price = (s / q) * (s / q); // token1 per token0
+  const amountNum = useMemo(() => {
+    const n = Number(amount || '0');
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }, [amount]);
 
-      let _ethPerBgld: number | undefined;
-      // orientation
-      if (poolToken0 === env.WETH && poolToken1 === env.BGLD) {
-        // price = BGLD per 1 WETH
-        const bgldPerEth = price;
-        _ethPerBgld = bgldPerEth > 0 ? 1 / bgldPerEth : undefined;
-      } else if (poolToken0 === env.BGLD && poolToken1 === env.WETH) {
-        // price = WETH per 1 BGLD
-        _ethPerBgld = price;
-      }
+  const estRewardBgld = useMemo(() => {
+    if (!amountNum) return 0;
+    return amountNum * (apr / 100) * (days / 365);
+  }, [amountNum, apr, days]);
 
-      const ethUsd = Number(env.ETH_USD_OVERRIDE) > 0 ? Number(env.ETH_USD_OVERRIDE) : undefined;
-      const _bgldUsd = _ethPerBgld && ethUsd ? _ethPerBgld * ethUsd : undefined;
-      return { ethPerBgld: _ethPerBgld, bgldUsd: _bgldUsd };
-    } catch {
-      return { ethPerBgld: undefined, bgldUsd: undefined };
-    }
-  }, [slot0, poolToken0, poolToken1]);
+  const estRewardUsd = useMemo(() => {
+    if (!priceUsd || !estRewardBgld) return 0;
+    return estRewardBgld * priceUsd;
+  }, [estRewardBgld, priceUsd]);
 
-  const estUsdHint =
-  priceUsd && parsedAmount
-    ? (Number(formatUnits(parsedAmount, bgldDecimals)) * priceUsd).toLocaleString(undefined, {
-        style: 'currency',
-        currency: 'USD',
-        maximumFractionDigits: 2,
-      })
-    : '—';
-
+  const estPrincipalUsd = useMemo(() => {
+    if (!priceUsd || !amountNum) return 0;
+    return amountNum * priceUsd;
+  }, [amountNum, priceUsd]);
 
   const { writeContractAsync } = useWriteContract();
 
@@ -203,7 +193,7 @@ const walletDisplay = Number.isFinite(walletBgldNum)
       setStatus('Staking…');
       // EXACT signature: stake(uint256 amount, uint32 daysLocked, bool autoCompound)
       const txHash = await writeContractAsync({
-        abi: STAKING_STUB_ABI as any, // keep minimal stub so "stake" always exists
+        abi: STAKING_STUB_ABI as any,
         address: env.STAKING as `0x${string}`,
         functionName: 'stake',
         args: [parsedAmount, Number(days), Boolean(autoCompound)],
@@ -219,54 +209,65 @@ const walletDisplay = Number.isFinite(walletBgldNum)
 
   return (
     <div className={className}>
+      {/* Status banner */}
       {status && (
-        <div className="mb-3 rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-sm text-red-200">
+        <div className="mb-3 rounded-lg border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">
           {status}
         </div>
       )}
 
+      {/* Terminal header row */}
+      <div className="mb-3 flex items-center justify-between rounded-2xl border border-amber-300/30 bg-black/40 px-4 py-3">
+        <div className="text-white/80 text-sm">
+          Live BGLD Price <span className="text-white/50">(via Dexscreener)</span>
+        </div>
+        <div className="text-amber-200 text-lg font-semibold">
+  {priceUsd
+    ? `$${priceUsd.toLocaleString(undefined, {
+        minimumFractionDigits: 6,
+        maximumFractionDigits: 8,
+      })}`
+    : '—'}
+</div>
+
+      </div>
+
       {/* Wallet balance line */}
-      <div className="mb-1 text-xs text-white/60">
+      <div className="mb-2 text-xs text-white/60">
         Wallet:&nbsp;
         <span className="text-amber-200">
           {formatUnits(walletBgld, bgldDecimals)} BGLD
         </span>
+        {priceUsd ? (
+          <span className="text-white/50"> &nbsp;(
+            {fmtUsd(walletBgldNum * priceUsd)}
+            )</span>
+        ) : null}
       </div>
 
-      {/* amount */}
+      {/* Amount */}
       <label className="block text-sm text-white/70 mb-1">Amount to Stake</label>
       <div className="flex items-center gap-2">
         <input
-          className="w-full rounded-xl bg-black/40 border border-white/10 px-3 py-2 text-amber-100"
+          className="w-full rounded-xl bg-black/40 border border-white/10 px-3 py-2 text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-300/40"
           inputMode="decimal"
           placeholder="0.0 BGLD"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
         />
         <button
-          className="px-3 py-2 rounded-xl border border-white/10 text-xs text-white/80"
+          className="px-3 py-2 rounded-xl border border-white/10 text-xs text-white/80 hover:bg-white/5 transition"
           onClick={() => setAmount(formatUnits(walletBgld, bgldDecimals))}
           type="button"
         >
           MAX
         </button>
       </div>
-      <div className="mt-1 text-xs text-white/50">Est. USD: {estUsdHint}</div>
-      {priceUsd ? (
-  <div className="mt-0.5 text-xs text-white/40">
-    Wallet: {formatUnits(walletBgld, bgldDecimals)} BGLD (
-    {(Number(formatUnits(walletBgld, bgldDecimals)) * priceUsd).toLocaleString(undefined, {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 2,
-    })}
-    )
-  </div>
-) : null}
+      <div className="mt-1 text-xs text-white/50">
+        Est. USD: {priceUsd && amountNum > 0 ? fmtUsd(estPrincipalUsd) : '—'}
+      </div>
 
-
-
-      {/* days slider */}
+      {/* Days slider */}
       <div className="mt-6">
         <div className="flex justify-between text-xs text-white/60 mb-1">
           <span>1 day</span>
@@ -279,21 +280,38 @@ const walletDisplay = Number.isFinite(walletBgldNum)
           max={30}
           value={days}
           onChange={(e) => setDays(clampDays(Number(e.target.value)))}
-          className="w-full"
+          className="w-full accent-amber-300"
         />
-        <div className="mt-1 text-xs text-white/60">
-  Wallet: {walletDisplay} BGLD
-</div>
-
+        <div className="mt-1 text-xs text-white/60">Wallet: {walletDisplay} BGLD</div>
       </div>
 
-      {/* auto-compound */}
+      {/* Preview stats (terminal cards) */}
+      <div className="mt-6 grid gap-3 md:grid-cols-3">
+        <div className="rounded-xl border border-white/10 bg-black/40 p-3">
+          <div className="text-xs text-white/60">Est. APR</div>
+          <div className="text-amber-200 text-xl font-semibold">{fmtNum(apr, 1)}%</div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-black/40 p-3">
+          <div className="text-xs text-white/60">Projected Reward</div>
+          <div className="text-amber-200 text-xl font-semibold">
+            {fmtNum(estRewardBgld, 2)} BGLD
+          </div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-black/40 p-3">
+          <div className="text-xs text-white/60">≈ USD Value</div>
+          <div className="text-emerald-200 text-xl font-semibold">
+            {priceUsd ? fmtUsd(estRewardUsd) : '—'}
+          </div>
+        </div>
+      </div>
+
+      {/* Auto-compound */}
       <div className="mt-6 rounded-2xl border border-white/10 bg-black/40 p-4">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-amber-200 font-semibold">Auto-Compound</div>
             <div className="text-sm text-white/70">
-              Rewards roll into principal and the lock restarts. You can turn it off from your vault later.
+              Rewards roll into principal and the lock restarts (runs every 48h when enabled).
             </div>
           </div>
           <label className="inline-flex items-center gap-2 text-sm">
@@ -307,15 +325,17 @@ const walletDisplay = Number.isFinite(walletBgldNum)
         </div>
       </div>
 
-      {/* actions (unchanged gating) */}
+      {/* Actions */}
       <div className="mt-6 grid grid-cols-2 gap-3">
         <button
           type="button"
           disabled={!parsedAmount || !address || wrongNetwork || !env.BGLD}
           onClick={onApprove}
-          className={`rounded-xl px-4 py-2 border ${
-            needsApprove ? 'border-amber-400 text-amber-200' : 'border-white/15 text-white/60'
-          } bg-black/40`}
+          className={`rounded-xl px-4 py-2 border bg-black/40 transition ${
+            needsApprove
+              ? 'border-amber-400 text-amber-200 hover:bg-amber-300/10'
+              : 'border-white/15 text-white/60'
+          }`}
         >
           {needsApprove ? 'Approve' : 'Approved ✓'}
         </button>
@@ -324,10 +344,15 @@ const walletDisplay = Number.isFinite(walletBgldNum)
           type="button"
           disabled={!parsedAmount || needsApprove || !env.STAKING_ENABLED || wrongNetwork}
           onClick={onStake}
-          className="rounded-xl px-4 py-2 border border-emerald-400 text-emerald-200 bg-black/40 disabled:opacity-50"
+          className="rounded-xl px-4 py-2 border border-emerald-400 text-emerald-200 bg-black/40 hover:bg-emerald-400/10 disabled:opacity-50 transition"
         >
           Stake
         </button>
+      </div>
+
+      {/* Footnote */}
+      <div className="mt-4 text-[11px] text-white/45 italic">
+        “Every compound reinforces the Reserve.”
       </div>
     </div>
   );

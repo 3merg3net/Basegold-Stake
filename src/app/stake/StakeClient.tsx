@@ -3,6 +3,7 @@
 import StakeForm from '@/components/StakeForm';
 
 import VaultsPanel from '@/components/VaultsPanel';
+import MetricsStrip from '@/components/MetricsStrip';
 
 type Props = {
   initialLockDays?: number;
@@ -10,11 +11,9 @@ type Props = {
 
 export default function StakeClient({ initialLockDays = 7 }: Props) {
   return (
+    
     <div className="space-y-10">
-      <section className="max-w-3xl mx-auto px-4 pb-6">
-        <StakeForm initialLockDays={initialLockDays} />
-      </section>
-      <section className="max-w-3xl mx-auto px-4 pb-4">
+        <section className="max-w-3xl mx-auto px-4 pb-4">
   <h1 className="text-2xl font-semibold text-amber-200 mb-3">Stake BGLD</h1>
   <p className="text-sm text-white/70 leading-relaxed mb-6">
     Lock your BGLD tokens in a vault to earn daily rewards. 
@@ -23,12 +22,19 @@ export default function StakeClient({ initialLockDays = 7 }: Props) {
     after your lock period ends.
   </p>
 </section>
+      <MetricsStrip />
+      <section className="max-w-3xl mx-auto px-4 pb-6">
+        <StakeForm initialLockDays={initialLockDays} />
+
+      </section>
+    
 
 
       {/* Restore the working “Your Vaults” panel under the Stake form */}
       <section className="max-w-5xl mx-auto px-4 pb-24">
         <VaultsPanel />
       </section>
+      
     </div>
   );
 }
