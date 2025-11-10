@@ -9,6 +9,7 @@ type Props = {
   demoPresets?: number[];
   /** Autoplay interval ms for compact mode. Default: 6000ms */
   autoCycleMs?: number;
+  /** Optional wrapper className */
   className?: string;
 };
 
@@ -22,10 +23,22 @@ function num(n?: number, digits = 2) {
   return Number(n).toPrecision(6);
 }
 
+// Smooth monotonic APR curve: 1d ≈ 10%, 30d ≈ 1200%
+function getAprForDays(days: number) {
+  const d = Math.max(1, Math.min(30, Math.floor(days)));
+  const minApr = 10;     // %
+  const maxApr = 1200;   // %
+  const t = (d - 1) / 29;              // 0..1
+  const curve = Math.pow(t, 1.6);      // ease-in for “dramatic” long locks
+  const apr = minApr + (maxApr - minApr) * curve;
+  return Math.round(apr);
+}
+
 export default function GoldCalculator({
   mode = 'full',
   demoPresets,
   autoCycleMs,
+  className,
 }: Props) {
   // Pull live price via the same endpoint your Metrics use: /api/bgld-dex
   const [priceUsd, setPriceUsd] = useState<number | null>(null);
@@ -55,7 +68,13 @@ export default function GoldCalculator({
   // Inputs
   const [amountBgld, setAmountBgld] = useState<string>('1000000'); // 1M default
   const [days, setDays] = useState<number>(7); // default lock
-  const [apr, setApr] = useState<number>(250); // default mid APR
+  const [apr, setApr] = useState<number>(getAprForDays(7)); // now driven by days
+  const [autoApr, setAutoApr] = useState<boolean>(true);    // NEW: auto APR from lock
+
+  // Keep APR synced with slider while autoApr enabled
+  useEffect(() => {
+    if (autoApr) setApr(getAprForDays(days));
+  }, [days, autoApr]);
 
   // Compact demo cycling for big-stacker vibe
   const presets = demoPresets ?? [1_000_000, 5_000_000, 10_000_000, 20_000_000];
@@ -87,10 +106,16 @@ export default function GoldCalculator({
     priceUsd != null ? estRewardsBgld * priceUsd : undefined;
 
   // UI
+  const isCompact = mode === 'compact';
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
-    <div className={mode === 'compact'
-      ? 'rounded-2xl border border-amber-300/30 bg-black/60 p-4'
-      : 'rounded-2xl border border-amber-300/30 bg-black/50 p-5 md:p-6'}>
+    <div
+      className={
+        (isCompact
+          ? 'rounded-2xl border border-amber-300/30 bg-black/60 p-4'
+          : 'rounded-2xl border border-amber-300/30 bg-black/50 p-5 md:p-6') +
+        (className ? ` ${className}` : '')
+      }
+    >
       {children}
     </div>
   );
@@ -99,7 +124,7 @@ export default function GoldCalculator({
     <Wrapper>
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm text-white/70">
-          <span className="font-semibold text-amber-300">BGLD Reward Vault Simulator</span>{' '}
+          <span className="font-semibold text-amber-300">BGLD Reward Estimator</span>{' '}
           <span className="text-white/50">· live price via Dexscreener</span>
         </div>
         {priceUsd != null && (
@@ -113,7 +138,7 @@ export default function GoldCalculator({
       </div>
 
       {/* Inputs */}
-      <div className={mode === 'compact' ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-2 md:grid-cols-3 gap-3'}>
+      <div className={isCompact ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-2 md:grid-cols-3 gap-3'}>
         <Field label="Amount (BGLD)">
           <input
             className="w-full rounded-xl bg-black/40 border border-white/10 px-3 py-2 text-amber-100"
@@ -127,7 +152,7 @@ export default function GoldCalculator({
           )}
         </Field>
 
-        <Field label="Lock (days)">
+        <Field label={`Lock (days)${autoApr ? ' · APR auto' : ''}`}>
           <input
             type="range"
             min={1}
@@ -137,6 +162,14 @@ export default function GoldCalculator({
             className="w-full"
           />
           <div className="mt-1 text-[11px] text-white/50">Selected: {days} day(s)</div>
+          <label className="mt-2 inline-flex items-center gap-2 text-xs text-white/70">
+            <input
+              type="checkbox"
+              checked={autoApr}
+              onChange={(e) => setAutoApr(e.target.checked)}
+            />
+            Auto APR from lock length
+          </label>
         </Field>
 
         <Field label="APR (%)">
@@ -147,7 +180,11 @@ export default function GoldCalculator({
             step={1}
             value={apr}
             onChange={(e) => setApr(Number(e.target.value))}
-            className="w-full rounded-xl bg-black/40 border border-white/10 px-3 py-2 text-amber-100"
+            disabled={autoApr} // disable when auto-apr is on
+            className={
+              'w-full rounded-xl bg-black/40 border px-3 py-2 text-amber-100 ' +
+              (autoApr ? 'border-white/20 opacity-70 cursor-not-allowed' : 'border-white/10')
+            }
             placeholder="e.g. 250"
           />
           <div className="mt-1 text-[11px] text-white/50">Range ~10% → 1200%</div>
