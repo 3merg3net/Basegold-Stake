@@ -1,6 +1,7 @@
 import VaultsPanel from '@/components/VaultsPanel';
 import Link from 'next/link';
-
+import VaultStats from '@/components/VaultStats';
+import MetricsStrip from '@/components/MetricsStrip';
 export const dynamic = 'force-static';
 
 export default function VaultsPage() {
@@ -16,6 +17,8 @@ export default function VaultsPage() {
           Here you can monitor, compound, and withdraw your active BGLD stakes — directly from the Base chain.
         </p>
       </header>
+      <MetricsStrip/>
+      <VaultStats/>
 
       {/* ===== Guidance box ===== */}
       <section className="rounded-2xl border border-amber-300/30 bg-black/50 px-6 py-6 mb-10 backdrop-blur shadow-[0_0_24px_rgba(212,175,55,0.08)]">

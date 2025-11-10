@@ -4,6 +4,8 @@
 import { useEffect, useState } from 'react';
 import GoldCalculator from '@/components/GoldCalculator';
 import Link from 'next/link';
+import MetricsStrip from '@/components/MetricsStrip';
+import VaultStats from '@/components/VaultStats';
 
 const SUPPLY = Number(process.env.NEXT_PUBLIC_BGLD_SUPPLY || '1000000000'); // for MC calc
 const BGLD_CA =
@@ -25,6 +27,8 @@ export default function StatusClient() {
           Main Base Gold Vault Contract Status
         </p>
       </header>
+      <MetricsStrip/>
+      <VaultStats/>
 
       {/* ===== New Status Grid (replaces MetricsStrip) ===== */}
       <section className="mb-10">

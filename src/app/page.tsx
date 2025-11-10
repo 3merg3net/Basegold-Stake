@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { useState } from 'react';
 import MetricsStrip from '@/components/MetricsStrip';
 import GoldCalculator from '@/components/GoldCalculator';
+import VaultStats from '@/components/VaultStats';
 
 // Env-driven config
 const BGLD_CA =
@@ -134,7 +135,8 @@ export default function HomePage() {
 
       {/* Live Vault Metrics */}
       <section className="px-6 pb-10 max-w-6xl mx-auto w-full">
-        <MetricsStrip className="shadow-lg" />
+        <MetricsStrip/>
+        <VaultStats/>
       </section>
 
       {/* ===== Live Calculator Widget ===== */}

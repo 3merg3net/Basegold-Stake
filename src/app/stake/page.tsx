@@ -1,6 +1,7 @@
 import StakeClient from './StakeClient';
 import MetricsStrip from '@/components/MetricsStrip';
 import GoldCalculator from '@/components/GoldCalculator';
+import VaultStats from '@/components/VaultStats';
 
 export const metadata = {
   title: 'Stake — Base Gold Reserve',
@@ -21,6 +22,8 @@ export default function StakePage() {
           a time-locked staking system that rewards conviction. Every lock term adds strength to the vault
           and compounds your holdings through transparent, onchain mechanics.
         </p>
+        <MetricsStrip/>
+              <VaultStats/>
         <p className="text-white/70 max-w-3xl mx-auto mt-3 leading-relaxed">
           Use the <span className="text-amber-300">Gold Compound Calculator</span> to preview yield, then set your
           amount and term to stake directly into the Reserve. Rewards are paid in <span className="text-amber-300 font-semibold">BGLD</span>,
@@ -74,7 +77,7 @@ export default function StakePage() {
         <p className="text-white/60 text-center mb-6 text-sm">
           Live data from the Base Gold protocol — updated in real time.
         </p>
-        <MetricsStrip />
+        
       </section>
     </main>
   );
