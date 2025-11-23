@@ -18,33 +18,81 @@ export default function StakePage() {
           Stake Your Gold. Strengthen the Reserve.
         </h1>
         <p className="text-white/80 max-w-3xl mx-auto leading-relaxed">
-          Welcome to the <span className="text-amber-300 font-semibold">Base Gold Reserve Vault</span> —
+          Welcome to the <span className="text-amber-300 font-semibold">Base Gold Reserve Vault</span> —{' '}
           a time-locked staking system that rewards conviction. Every lock term adds strength to the vault
           and compounds your holdings through transparent, onchain mechanics.
         </p>
-        <MetricsStrip/>
-              <VaultStats/>
+
+        {/* Global market + vault stats */}
+        <MetricsStrip />
+        <VaultStats />
+
         <p className="text-white/70 max-w-3xl mx-auto mt-3 leading-relaxed">
-          Use the <span className="text-amber-300">Gold Compound Calculator</span> to preview yield, then set your
-          amount and term to stake directly into the Reserve. Rewards are paid in <span className="text-amber-300 font-semibold">BGLD</span>,
-          vest continuously, and scale with your lock duration — up to <span className="text-emerald-300 font-semibold">1200% APR</span>.
+          Use the staking module below to lock BGLD directly into the Reserve. Rewards are paid in{' '}
+          <span className="text-amber-300 font-semibold">BGLD</span>, vest continuously, and scale with your
+          lock duration — up to <span className="text-emerald-300 font-semibold">1200% APR</span>.
         </p>
       </section>
 
-      {/* ===== Live Calculator (small) ===== */}
-      <div className="mb-10 max-w-xl mx-auto">
-        <GoldCalculator mode="full" className="scale-[.97]" />
+      {/* ===== 3-Step How-To (Version B) ===== */}
+      <section className="max-w-2xl mx-auto mb-10">
+        <div className="rounded-2xl border border-white/12 bg-black/40 px-5 py-5">
+          <h2 className="text-lg md:text-xl font-semibold text-amber-300 mb-3 text-center">
+            How to Stake in 3 Steps
+          </h2>
+          <div className="space-y-3 text-sm md:text-base">
+            <div className="flex gap-3">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-300 text-black text-xs font-bold">
+                1
+              </div>
+              <div>
+                <div className="font-semibold text-white/90">Stake Your BGLD</div>
+                <p className="text-white/70">
+                  Enter your amount and choose a lock between <strong>1–30 days</strong>. Longer locks target
+                  higher APR, up to <span className="text-emerald-300 font-semibold">1200%</span>.
+                </p>
+              </div>
+            </div>
 
-      </div>
+            <div className="flex gap-3">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-black text-xs font-bold">
+                2
+              </div>
+              <div>
+                <div className="font-semibold text-white/90">Approve → Stake</div>
+                <p className="text-white/70">
+                  Tap <span className="text-amber-300 font-semibold">Approve</span>, then tap{' '}
+                  <span className="text-emerald-300 font-semibold">Stake</span> once it lights up. Your position
+                  becomes a live <span className="text-amber-300">Vault</span> earning rewards onchain.
+                </p>
+              </div>
+            </div>
 
-      {/* ===== Staking Card ===== */}
-      <section className="max-w-2xl mx-auto">
+            <div className="flex gap-3">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-400 text-black text-xs font-bold">
+                3
+              </div>
+              <div>
+                <div className="font-semibold text-white/90">Grow Your Gold</div>
+                <p className="text-white/70">
+                  Compound to roll rewards into principal, enable auto-compound, or withdraw at maturity. You can
+                  manage every vault anytime from the <span className="text-amber-300 font-semibold">Vaults</span> page.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== Staking Card (primary action) ===== */}
+      <section className="max-w-2xl mx-auto mb-12">
         <div className="rounded-2xl border border-amber-300/30 bg-black/50 backdrop-blur px-5 py-6 shadow-[0_0_24px_rgba(212,175,55,0.08)]">
           <h2 className="text-2xl font-semibold mb-4 text-amber-300">Your Vault Position</h2>
           <p className="text-white/70 mb-6 leading-relaxed">
-            Choose how long to lock your BGLD — anywhere from <strong>1 to 30 days</strong>. Longer terms earn higher rewards.
-            Enable <span className="text-amber-300">auto-compound</span> to roll vested rewards into principal every 48h,
-            or compound manually every 24h to fine-tune growth. <em>Each compound restarts the lock.</em>
+            Choose how long to lock your BGLD — anywhere from <strong>1 to 30 days</strong>. Longer terms earn
+            higher rewards. Enable <span className="text-amber-300">auto-compound</span> to roll vested rewards
+            into principal every 48h, or compound manually every 24h to fine-tune growth.{' '}
+            <em>Each compound restarts the lock.</em>
           </p>
 
           {/* Stake form inside card */}
@@ -55,13 +103,34 @@ export default function StakePage() {
         <div className="mt-6 rounded-2xl border border-white/12 bg-black/40 px-5 py-5">
           <h3 className="text-lg font-semibold text-amber-300 mb-2">Vault Mechanics — Quick Summary</h3>
           <ul className="list-disc pl-5 space-y-2 text-white/80 text-sm leading-relaxed">
-            <li><span className="text-white/90 font-semibold">Rewards:</span> Paid in BGLD and vest continuously over your selected lock.</li>
-            <li><span className="text-white/90 font-semibold">APR:</span> Targets scale with duration — approx. <strong>10% → 1200%</strong>.</li>
-            <li><span className="text-white/90 font-semibold">Manual Compound:</span> Every <strong>24h</strong>, <strong>1%</strong> fee; adds vested rewards to principal; <em>restarts lock</em>.</li>
-            <li><span className="text-white/90 font-semibold">Auto-Compound (optional):</span> Every <strong>48h</strong>, <strong>1%</strong> fee retained in vault; <em>restarts lock</em>.</li>
-            <li><span className="text-white/90 font-semibold">Withdraw at Maturity:</span> <strong>2%</strong> fee on principal + vested rewards.</li>
-            <li><span className="text-white/90 font-semibold">Early Exit:</span> Penalty decays from <strong>10% → 2%</strong> linearly; only vested rewards are paid.</li>
-            <li><span className="text-white/90 font-semibold">POL:</span> Team purchased supply at launch to seed vaults and deepen protocol-owned liquidity.</li>
+            <li>
+              <span className="text-white/90 font-semibold">Rewards:</span> Paid in BGLD and vest continuously
+              over your selected lock.
+            </li>
+            <li>
+              <span className="text-white/90 font-semibold">APR:</span> Targets scale with duration — approx.{' '}
+              <strong>10% → 1200%</strong>.
+            </li>
+            <li>
+              <span className="text-white/90 font-semibold">Manual Compound:</span> Every <strong>24h</strong>,{' '}
+              <strong>1%</strong> fee; adds vested rewards to principal; <em>restarts lock</em>.
+            </li>
+            <li>
+              <span className="text-white/90 font-semibold">Auto-Compound (optional):</span> Every{' '}
+              <strong>48h</strong>, <strong>1%</strong> fee retained in vault; <em>restarts lock</em>.
+            </li>
+            <li>
+              <span className="text-white/90 font-semibold">Withdraw at Maturity:</span>{' '}
+              <strong>2%</strong> fee on principal + vested rewards.
+            </li>
+            <li>
+              <span className="text-white/90 font-semibold">Early Exit:</span> Penalty decays from{' '}
+              <strong>10% → 2%</strong> linearly; only vested rewards are paid.
+            </li>
+            <li>
+              <span className="text-white/90 font-semibold">POL:</span> Team purchased supply at launch to seed
+              vaults and deepen protocol-owned liquidity.
+            </li>
           </ul>
           <p className="text-[11px] text-white/45 mt-3 italic">
             “Every compound reinforces the Reserve.”
@@ -69,15 +138,16 @@ export default function StakePage() {
         </div>
       </section>
 
-      {/* ===== Metrics Strip (Vault Health) ===== */}
-      <section className="mt-16">
-        <h3 className="text-xl font-semibold mb-2 text-center text-white/90">
-          Vault Health & Network Metrics
+      {/* ===== Calculator (optional, bottom) ===== */}
+      <section className="max-w-xl mx-auto mb-16">
+        <h3 className="text-xl font-semibold text-center text-white/90 mb-3">
+          Optional · Gold Compound Calculator
         </h3>
-        <p className="text-white/60 text-center mb-6 text-sm">
-          Live data from the Base Gold protocol — updated in real time.
+        <p className="text-sm text-white/60 text-center mb-4">
+          Use this to preview estimated rewards before staking — it does not affect your actual vault position.
         </p>
-        
+
+        <GoldCalculator mode="full" className="scale-[.97]" />
       </section>
     </main>
   );
