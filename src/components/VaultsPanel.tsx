@@ -15,29 +15,92 @@ const env = {
 
 /* ───────── Minimal staking ABI ───────── */
 const STAKING_ABI: any = [
-  { type: 'function', name: 'positionsOf', stateMutability: 'view', inputs: [{ name: 'user', type: 'address' }], outputs: [{ type: 'uint256[]' }] },
-  { type: 'function', name: 'positions', stateMutability: 'view', inputs: [{ name: 'id', type: 'uint256' }], outputs: [
-    { name: 'owner', type: 'address' },
-    { name: 'amount', type: 'uint256' },
-    { name: 'start', type: 'uint64' },
-    { name: 'lastCompoundAt', type: 'uint64' },
-    { name: 'daysLocked', type: 'uint32' },
-    { name: 'autoCompound', type: 'bool' },
-    { name: 'closed', type: 'bool' },
-  ]},
-  { type: 'function', name: 'pendingRewards', stateMutability: 'view', inputs: [{ name: 'id', type: 'uint256' }], outputs: [
-    { name: 'vested', type: 'uint256' },
-    { name: 'total', type: 'uint256' },
-  ]},
-  { type: 'function', name: 'aprForDays', stateMutability: 'view', inputs: [{ name: 'daysLocked', type: 'uint32' }], outputs: [{ type: 'uint32' }] },
-  { type: 'function', name: 'termSeconds', stateMutability: 'pure', inputs: [{ name: 'daysLocked', type: 'uint32' }], outputs: [{ type: 'uint256' }] },
-  { type: 'function', name: 'principalExitFeeBps', stateMutability: 'view', inputs: [{ name: 'id', type: 'uint256' }], outputs: [{ type: 'uint32' }] },
+  {
+    type: 'function',
+    name: 'positionsOf',
+    stateMutability: 'view',
+    inputs: [{ name: 'user', type: 'address' }],
+    outputs: [{ type: 'uint256[]' }],
+  },
+  {
+    type: 'function',
+    name: 'positions',
+    stateMutability: 'view',
+    inputs: [{ name: 'id', type: 'uint256' }],
+    outputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'start', type: 'uint64' },
+      { name: 'lastCompoundAt', type: 'uint64' },
+      { name: 'daysLocked', type: 'uint32' },
+      { name: 'autoCompound', type: 'bool' },
+      { name: 'closed', type: 'bool' },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'pendingRewards',
+    stateMutability: 'view',
+    inputs: [{ name: 'id', type: 'uint256' }],
+    outputs: [
+      { name: 'vested', type: 'uint256' },
+      { name: 'total', type: 'uint256' },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'aprForDays',
+    stateMutability: 'view',
+    inputs: [{ name: 'daysLocked', type: 'uint32' }],
+    outputs: [{ type: 'uint32' }],
+  },
+  {
+    type: 'function',
+    name: 'termSeconds',
+    stateMutability: 'pure',
+    inputs: [{ name: 'daysLocked', type: 'uint32' }],
+    outputs: [{ type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'principalExitFeeBps',
+    stateMutability: 'view',
+    inputs: [{ name: 'id', type: 'uint256' }],
+    outputs: [{ type: 'uint32' }],
+  },
 
   // actions
-  { type: 'function', name: 'compound', stateMutability: 'nonpayable', inputs: [{ name: 'id', type: 'uint256' }], outputs: [] },
-  { type: 'function', name: 'withdraw', stateMutability: 'nonpayable', inputs: [{ name: 'id', type: 'uint256' }], outputs: [] },
-  { type: 'function', name: 'emergencyExit', stateMutability: 'nonpayable', inputs: [{ name: 'id', type: 'uint256' }], outputs: [] },
-  { type: 'function', name: 'setAutoCompound', stateMutability: 'nonpayable', inputs: [{ name: 'id', type: 'uint256' }, { name: 'enabled', type: 'bool' }], outputs: [] },
+  {
+    type: 'function',
+    name: 'compound',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'id', type: 'uint256' }],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'withdraw',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'id', type: 'uint256' }],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'emergencyExit',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'id', type: 'uint256' }],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'setAutoCompound',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'id', type: 'uint256' },
+      { name: 'enabled', type: 'bool' },
+    ],
+    outputs: [],
+  },
 ];
 
 /* ───────── helpers ───────── */
@@ -53,7 +116,11 @@ function fmtBgld(v: bigint | undefined, decimals = 18, digits = 4) {
 }
 function moneyFmt(n?: number, digits = 2) {
   if (!Number.isFinite(n!)) return '—';
-  return n!.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: digits });
+  return n!.toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: digits,
+  });
 }
 function secsToDHMS(secsNum: number) {
   if (!Number.isFinite(secsNum) || secsNum <= 0) return '0d 0h';
@@ -65,7 +132,11 @@ function secsToDHMS(secsNum: number) {
 
 /* ───────── Component ───────── */
 export default function VaultsPanel({ className }: { className?: string }) {
-  const { address } = useAccount();
+  const { address, chainId } = useAccount();
+  const wrongNetwork = useMemo(
+    () => Boolean(chainId && env.CHAIN_ID && chainId !== env.CHAIN_ID),
+    [chainId]
+  );
   const enabled = Boolean(address && env.STAKING);
   const priceUsd = useBgldPrice();
 
@@ -76,46 +147,89 @@ export default function VaultsPanel({ className }: { className?: string }) {
   };
 
   // 1) IDs
-  const { data: idsData, refetch: refetchIds } = useReadContracts({
+  const {
+    data: idsData,
+    refetch: refetchIds,
+    isLoading: idsLoading,
+  } = useReadContracts({
     allowFailure: true,
-    contracts: enabled
-      ? [{ abi: STAKING_ABI, address: env.STAKING as `0x${string}`, functionName: 'positionsOf', args: [address as `0x${string}`] }]
-      : [],
-    query: { enabled },
+    contracts:
+      enabled && !wrongNetwork
+        ? [
+            {
+              abi: STAKING_ABI,
+              address: env.STAKING as `0x${string}`,
+              functionName: 'positionsOf',
+              args: [address as `0x${string}`],
+            },
+          ]
+        : [],
+    query: { enabled: enabled && !wrongNetwork },
   });
+
   const idList = (idsData?.[0]?.result as bigint[] | undefined) ?? [];
 
   // 2) reads for each id
   const posContracts = useMemo(() => {
-    if (!enabled || idList.length === 0) return [];
+    if (!enabled || wrongNetwork || idList.length === 0) return [];
     const c: any[] = [];
     for (const id of idList) {
-      c.push({ abi: STAKING_ABI, address: env.STAKING as `0x${string}`, functionName: 'positions', args: [id] });
-      c.push({ abi: STAKING_ABI, address: env.STAKING as `0x${string}`, functionName: 'pendingRewards', args: [id] });
-      c.push({ abi: STAKING_ABI, address: env.STAKING as `0x${string}`, functionName: 'principalExitFeeBps', args: [id] });
+      c.push({
+        abi: STAKING_ABI,
+        address: env.STAKING as `0x${string}`,
+        functionName: 'positions',
+        args: [id],
+      });
+      c.push({
+        abi: STAKING_ABI,
+        address: env.STAKING as `0x${string}`,
+        functionName: 'pendingRewards',
+        args: [id],
+      });
+      c.push({
+        abi: STAKING_ABI,
+        address: env.STAKING as `0x${string}`,
+        functionName: 'principalExitFeeBps',
+        args: [id],
+      });
     }
     return c;
-  }, [enabled, idList, env.STAKING]);
+  }, [enabled, wrongNetwork, idList, env.STAKING]);
 
   const aprTermContracts = useMemo(() => {
-    if (!enabled || idList.length === 0) return [];
+    if (!enabled || wrongNetwork || idList.length === 0) return [];
     const c: any[] = [];
     for (let d = 1; d <= 30; d++) {
-      c.push({ abi: STAKING_ABI, address: env.STAKING as `0x${string}`, functionName: 'aprForDays', args: [d] });
-      c.push({ abi: STAKING_ABI, address: env.STAKING as `0x${string}`, functionName: 'termSeconds', args: [d] });
+      c.push({
+        abi: STAKING_ABI,
+        address: env.STAKING as `0x${string}`,
+        functionName: 'aprForDays',
+        args: [d],
+      });
+      c.push({
+        abi: STAKING_ABI,
+        address: env.STAKING as `0x${string}`,
+        functionName: 'termSeconds',
+        args: [d],
+      });
     }
     return c;
-  }, [enabled, idList.length, env.STAKING]);
+  }, [enabled, wrongNetwork, idList.length, env.STAKING]);
 
-  const { data: posReads, refetch: refetchPos } = useReadContracts({
+  const {
+    data: posReads,
+    refetch: refetchPos,
+    isLoading: posLoading,
+  } = useReadContracts({
     allowFailure: true,
     contracts: posContracts,
-    query: { enabled: enabled && posContracts.length > 0 },
+    query: { enabled: enabled && !wrongNetwork && posContracts.length > 0 },
   });
+
   const { data: aprTermReads } = useReadContracts({
     allowFailure: true,
     contracts: aprTermContracts,
-    query: { enabled: enabled && aprTermContracts.length > 0 },
+    query: { enabled: enabled && !wrongNetwork && aprTermContracts.length > 0 },
   });
 
   // Lookups
@@ -159,9 +273,11 @@ export default function VaultsPanel({ className }: { className?: string }) {
     const out: Row[] = [];
     for (let i = 0; i < idList.length; i++) {
       const id = idList[i];
-      const posTuple = posReads[i * 3]?.result as [string, bigint, bigint, bigint, number, boolean, boolean] | undefined;
-      const prTuple  = posReads[i * 3 + 1]?.result as [bigint, bigint] | undefined;
-      const feeBps   = posReads[i * 3 + 2]?.result as number | undefined;
+      const posTuple = posReads[i * 3]?.result as
+        | [string, bigint, bigint, bigint, number, boolean, boolean]
+        | undefined;
+      const prTuple = posReads[i * 3 + 1]?.result as [bigint, bigint] | undefined;
+      const feeBps = posReads[i * 3 + 2]?.result as number | undefined;
       if (!posTuple) continue;
 
       const amount = posTuple[1];
@@ -171,10 +287,17 @@ export default function VaultsPanel({ className }: { className?: string }) {
       const closed = posTuple[6];
 
       const vested = prTuple?.[0] ?? 0n;
-      const total  = prTuple?.[1] ?? 0n;
+      const total = prTuple?.[1] ?? 0n;
 
       out.push({
-        id, amount, start, daysLocked, autoCompound, closed, vested, total,
+        id,
+        amount,
+        start,
+        daysLocked,
+        autoCompound,
+        closed,
+        vested,
+        total,
         exitFeeBps: typeof feeBps === 'number' ? feeBps : 0,
       });
     }
@@ -182,50 +305,99 @@ export default function VaultsPanel({ className }: { className?: string }) {
   }, [posReads, idList]);
 
   // hide closed/empty
-  const visibleRows = useMemo(() => rows.filter(r => !r.closed && r.amount > 0n), [rows]);
+  const visibleRows = useMemo(() => rows.filter((r) => !r.closed && r.amount > 0n), [rows]);
 
   // actions
   const { writeContractAsync } = useWriteContract();
 
   async function doAction(fn: 'compound' | 'withdraw' | 'emergencyExit', id: bigint) {
-  const tx = await writeContractAsync({
-    abi: STAKING_ABI,
-    address: env.STAKING as `0x${string}`,
-    functionName: fn,
-    args: [id],
-    chainId: env.CHAIN_ID, // ← fixed here
-  });
-  setTimeout(() => { refetchPos(); refetchIds(); }, 1500);
-  return tx;
-}
+    const tx = await writeContractAsync({
+      abi: STAKING_ABI,
+      address: env.STAKING as `0x${string}`,
+      functionName: fn,
+      args: [id],
+      chainId: env.CHAIN_ID,
+    });
+    setTimeout(() => {
+      refetchPos();
+      refetchIds();
+    }, 1500);
+    return tx;
+  }
 
-  async function toggleAuto(id: bigint, enabled: boolean) {
+  async function toggleAuto(id: bigint, enabledFlag: boolean) {
     const tx = await writeContractAsync({
       abi: STAKING_ABI,
       address: env.STAKING as `0x${string}`,
       functionName: 'setAutoCompound',
-      args: [id, enabled],
+      args: [id, enabledFlag],
       chainId: env.CHAIN_ID,
     });
-    setTimeout(() => { refetchPos(); }, 1500);
+    setTimeout(() => {
+      refetchPos();
+    }, 1500);
     return tx;
   }
 
-  /* ───────── Empty states ───────── */
-  if (!enabled) {
+  /* ───────── Empty / state handling ───────── */
+
+  // Not connected
+  if (!address) {
     return (
       <div className={className}>
-        <div className="rounded-2xl border border-white/12 bg-black/50 p-5 text-white/70">
-          Connect wallet to view your vaults.
+        <div className="rounded-2xl border border-white/12 bg-black/50 p-5 text-white/70 text-sm">
+          Connect your wallet to view your BGLD vault positions.
         </div>
       </div>
     );
   }
-  if (idList.length === 0) {
+
+  // Wrong network
+  if (wrongNetwork) {
     return (
       <div className={className}>
-        <div className="rounded-2xl border border-white/12 bg-black/50 p-5 text-white/70">
-          No vaults yet. Stake BGLD to open your first vault.
+        <div className="rounded-2xl border border-amber-400/40 bg-black/50 p-5 text-sm">
+          <div className="font-semibold text-amber-200 mb-1">Wrong network</div>
+          <div className="text-white/70">
+            Please switch your wallet to{' '}
+            <span className="font-semibold">Base (chain ID 8453)</span> to view and manage your
+            vaults.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading ids / positions
+  if (idsLoading || (enabled && !wrongNetwork && idList.length > 0 && posLoading)) {
+    return (
+      <div className={className}>
+        <div className="rounded-2xl border border-white/12 bg-black/50 p-5 text-white/70 text-sm">
+          Loading your vaults from the Base Gold contracts…
+        </div>
+      </div>
+    );
+  }
+
+  // No vaults (or all closed)
+  if (idList.length === 0 || visibleRows.length === 0) {
+    return (
+      <div className={className}>
+        <div className="rounded-2xl border border-white/12 bg-black/50 p-5 text-sm">
+          <div className="text-white/80 mb-2">No active vaults found.</div>
+          <div className="text-white/60">
+            If you recently opened a vault or switched wallets, it may take a moment to sync.
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              refetchIds();
+              refetchPos();
+            }}
+            className="mt-3 inline-flex items-center rounded-lg border border-amber-300/40 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-300/10 transition"
+          >
+            Refresh vaults
+          </button>
         </div>
       </div>
     );
@@ -244,10 +416,14 @@ export default function VaultsPanel({ className }: { className?: string }) {
           const remainingSec = end > now ? Number(end - now) : 0;
           const termSecNum = Number(termSec);
           const elapsed = Math.max(0, termSecNum - remainingSec);
-          const progress = termSecNum > 0 ? Math.min(100, Math.floor((elapsed / termSecNum) * 100)) : 0;
+          const progress =
+            termSecNum > 0 ? Math.min(100, Math.floor((elapsed / termSecNum) * 100)) : 0;
 
           return (
-            <div key={String(r.id)} className="rounded-2xl border border-white/12 bg-black/50 p-5 shadow-[0_0_24px_rgba(212,175,55,0.05)]">
+            <div
+              key={String(r.id)}
+              className="rounded-2xl border border-white/12 bg-black/50 p-5 shadow-[0_0_24px_rgba(212,175,55,0.05)]"
+            >
               {/* Header row */}
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="text-sm text-white/70">
@@ -257,13 +433,19 @@ export default function VaultsPanel({ className }: { className?: string }) {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1 text-xs text-amber-200">
-                    APR {(aprBps / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%
+                    APR{' '}
+                    {(aprBps / 100).toLocaleString(undefined, {
+                      maximumFractionDigits: 2,
+                    })}
+                    %
                   </span>
-                  <span className={`rounded-full border px-3 py-1 text-xs ${
-                    r.autoCompound
-                      ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200'
-                      : 'border-white/15 bg-white/5 text-white/70'
-                  }`}>
+                  <span
+                    className={`rounded-full border px-3 py-1 text-xs ${
+                      r.autoCompound
+                        ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200'
+                        : 'border-white/15 bg-white/5 text-white/70'
+                    }`}
+                  >
                     {r.autoCompound ? 'Auto-Compound ON' : 'Auto-Compound OFF'}
                   </span>
                 </div>
@@ -289,28 +471,43 @@ export default function VaultsPanel({ className }: { className?: string }) {
               <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Metric
                   label="Principal"
-                  value={`${fmtBgld(r.amount, 18, 4)} BGLD${priceUsd ? ` · ${moneyFmt(toUsd(r.amount)!, 2)}` : ''}`}
+                  value={`${fmtBgld(r.amount, 18, 4)} BGLD${
+                    priceUsd && toUsd(r.amount) !== undefined
+                      ? ` · ${moneyFmt(toUsd(r.amount)!, 2)}`
+                      : ''
+                  }`}
                 />
                 <Metric
                   label="Vested Rewards"
-                  value={`${fmtBgld(r.vested, 18, 4)} BGLD${priceUsd ? ` · ${moneyFmt(toUsd(r.vested)!, 2)}` : ''}`}
+                  value={`${fmtBgld(r.vested, 18, 4)} BGLD${
+                    priceUsd && toUsd(r.vested) !== undefined
+                      ? ` · ${moneyFmt(toUsd(r.vested)!, 2)}`
+                      : ''
+                  }`}
                 />
                 <Metric
                   label="Total Rewards"
-                  value={`${fmtBgld(r.total, 18, 4)} BGLD${priceUsd ? ` · ${moneyFmt(toUsd(r.total)!, 2)}` : ''}`}
+                  value={`${fmtBgld(r.total, 18, 4)} BGLD${
+                    priceUsd && toUsd(r.total) !== undefined
+                      ? ` · ${moneyFmt(toUsd(r.total)!, 2)}`
+                      : ''
+                  }`}
                 />
                 <Metric label="Exit Fee (now)" value={`${(r.exitFeeBps / 100).toFixed(2)}%`} />
                 <Metric label="Remaining" value={secsToDHMS(remainingSec)} />
                 <Metric label="Status" value={r.closed ? 'Closed' : 'Active'} />
 
-                {/* Inline disclaimer (fills the blank area on the right of Status) */}
+                {/* Inline disclaimer (fills the blank area) */}
                 <div className="col-span-2 sm:col-span-2 rounded-xl border border-white/10 bg-black/40 p-3">
                   <p className="text-[11px] leading-relaxed text-white/55">
-                    <span className="text-white/70 font-semibold">Reminder:</span> Early exit applies a decaying penalty from
-                    <span className="text-amber-200"> 10%</span> down to <span className="text-amber-200">1%</span> as maturity approaches.{' '}
-                    Withdrawals at maturity incur a <span className="text-amber-200">2%</span> fee on principal + vested rewards.{' '}
-                    Manual compound (every 24h) and Auto-Compound (every 48h) each incur a <span className="text-amber-200">1%</span> protocol fee
-                    and restart the lock.
+                    <span className="text-white/70 font-semibold">Reminder:</span> Early exit
+                    applies a decaying penalty from
+                    <span className="text-amber-200"> 10%</span> down to{' '}
+                    <span className="text-amber-200">1%</span> as maturity approaches. Withdrawals at
+                    maturity incur a <span className="text-amber-200">2%</span> fee on principal +
+                    vested rewards. Manual compound (every 24h) and Auto-Compound (every 48h) each
+                    incur a <span className="text-amber-200">1%</span> protocol fee and restart the
+                    lock.
                   </p>
                 </div>
               </div>
@@ -359,8 +556,12 @@ export default function VaultsPanel({ className }: { className?: string }) {
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-xl border border-white/12 bg-black/40 p-3">
-      <div className="text-[11px] uppercase tracking-wider text-white/60 truncate">{label}</div>
-      <div className="mt-0.5 text-sm font-semibold text-amber-200 tabular-nums truncate">{value}</div>
+      <div className="text-[11px] uppercase tracking-wider text-white/60 truncate">
+        {label}
+      </div>
+      <div className="mt-0.5 text-sm font-semibold text-amber-200 tabular-nums truncate">
+        {value}
+      </div>
     </div>
   );
 }

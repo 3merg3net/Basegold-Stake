@@ -32,15 +32,21 @@ const STAKING_STUB_ABI = [
 
 // (kept for compatibility with your reads list)
 const UNIV3_POOL_ABI = [
-  { type: 'function', name: 'slot0', stateMutability: 'view', inputs: [], outputs: [
-    { name: 'sqrtPriceX96', type: 'uint160' },
-    { name: 'tick', type: 'int24' },
-    { name: 'observationIndex', type: 'uint16' },
-    { name: 'observationCardinality', type: 'uint16' },
-    { name: 'observationCardinalityNext', type: 'uint16' },
-    { name: 'feeProtocol', type: 'uint8' },
-    { name: 'unlocked', type: 'bool' },
-  ] },
+  {
+    type: 'function',
+    name: 'slot0',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      { name: 'sqrtPriceX96', type: 'uint160' },
+      { name: 'tick', type: 'int24' },
+      { name: 'observationIndex', type: 'uint16' },
+      { name: 'observationCardinality', type: 'uint16' },
+      { name: 'observationCardinalityNext', type: 'uint16' },
+      { name: 'feeProtocol', type: 'uint8' },
+      { name: 'unlocked', type: 'bool' },
+    ],
+  },
   { type: 'function', name: 'token0', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
   { type: 'function', name: 'token1', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
 ] as const;
@@ -56,7 +62,10 @@ const env = {
   POOL: (process.env.NEXT_PUBLIC_UNIV3_POOL || '').trim().toLowerCase(),
   WETH: (process.env.NEXT_PUBLIC_WETH_ADDRESS || '').trim().toLowerCase(),
   CHAIN_ID: Number(process.env.NEXT_PUBLIC_CHAIN_ID || '8453'),
-  STAKING_ENABLED: (process.env.NEXT_PUBLIC_STAKING_ENABLED ?? process.env.NEXT_PUBLIC_DISABLE_STAKING ?? '0') === '0', // ON unless explicitly disabled
+  STAKING_ENABLED:
+    (process.env.NEXT_PUBLIC_STAKING_ENABLED ??
+      process.env.NEXT_PUBLIC_DISABLE_STAKING ??
+      '0') === '0', // ON unless explicitly disabled
   ETH_USD_OVERRIDE: (process.env.NEXT_PUBLIC_ETH_USD_OVERRIDE || '').trim(),
 };
 
@@ -75,9 +84,9 @@ function fmtUsd(n?: number) {
 
 // --- APR curve used across app (matches calculator) ---
 function getAPR(days: number): number {
-  if (days <= 5) return 10 + (days - 1) * 7.5;      // 10–40%
-  if (days <= 14) return 100 + (days - 6) * 25;     // 100–300%
-  const extra = Math.max(0, days - 15);             // 15–30 → 400–1200%
+  if (days <= 5) return 10 + (days - 1) * 7.5; // 10–40%
+  if (days <= 14) return 100 + (days - 6) * 25; // 100–300%
+  const extra = Math.max(0, days - 15); // 15–30 → 400–1200%
   return 400 + extra * 53.3;
 }
 
@@ -89,28 +98,48 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
   const [autoCompound, setAutoCompound] = useState<boolean>(false);
   const [status, setStatus] = useState<string>('');
 
-  // Live BGLD/USD via your hook (backed by /api/gold using Dexscreener)
+  // Live BGLD/USD via your hook (backed by /api/gold)
   const priceUsd = useBgldPrice();
 
   // --- Reads: ERC20 (decimals, balance, allowance) + Pool (slot0/token0/token1) ---
-  const { data: reads, refetch: refetchReads } = useReadContracts({
+  const { data: reads, refetch: refetchReads, isLoading: readsLoading } = useReadContracts({
     allowFailure: true,
     contracts: [
       // ERC20
       { abi: ERC20_ABI as any, address: env.BGLD as `0x${string}`, functionName: 'decimals' },
-      address ? { abi: ERC20_ABI as any, address: env.BGLD as `0x${string}`, functionName: 'balanceOf', args: [address as `0x${string}`] } : undefined,
-      address ? { abi: ERC20_ABI as any, address: env.BGLD as `0x${string}`, functionName: 'allowance', args: [address as `0x${string}`, env.STAKING as `0x${string}`] } : undefined,
+      address
+        ? {
+            abi: ERC20_ABI as any,
+            address: env.BGLD as `0x${string}`,
+            functionName: 'balanceOf',
+            args: [address as `0x${string}`],
+          }
+        : undefined,
+      address
+        ? {
+            abi: ERC20_ABI as any,
+            address: env.BGLD as `0x${string}`,
+            functionName: 'allowance',
+            args: [address as `0x${string}`, env.STAKING as `0x${string}`],
+          }
+        : undefined,
 
       // (kept for compatibility)
-      env.POOL ? { abi: UNIV3_POOL_ABI as any, address: env.POOL as `0x${string}`, functionName: 'slot0' } : undefined,
-      env.POOL ? { abi: UNIV3_POOL_ABI as any, address: env.POOL as `0x${string}`, functionName: 'token0' } : undefined,
-      env.POOL ? { abi: UNIV3_POOL_ABI as any, address: env.POOL as `0x${string}`, functionName: 'token1' } : undefined,
+      env.POOL
+        ? { abi: UNIV3_POOL_ABI as any, address: env.POOL as `0x${string}`, functionName: 'slot0' }
+        : undefined,
+      env.POOL
+        ? { abi: UNIV3_POOL_ABI as any, address: env.POOL as `0x${string}`, functionName: 'token0' }
+        : undefined,
+      env.POOL
+        ? { abi: UNIV3_POOL_ABI as any, address: env.POOL as `0x${string}`, functionName: 'token1' }
+        : undefined,
     ].filter(Boolean) as any[],
   });
 
   const bgldDecimals = (reads?.[0]?.result as number | undefined) ?? 18;
-  const walletBgld   = (reads?.[1]?.result as bigint | undefined) ?? 0n;
-  const allowance    = (reads?.[2]?.result as bigint | undefined) ?? 0n;
+  const walletBgld = (reads?.[1]?.result as bigint | undefined) ?? 0n;
+  const allowance = (reads?.[2]?.result as bigint | undefined) ?? 0n;
 
   const walletBgldNum = Number(formatUnits(walletBgld, bgldDecimals));
   const walletDisplay = Number.isFinite(walletBgldNum)
@@ -122,7 +151,9 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
     try {
       if (!amount || Number(amount) <= 0) return undefined;
       return parseUnits(amount, bgldDecimals);
-    } catch { return undefined; }
+    } catch {
+      return undefined;
+    }
   }, [amount, bgldDecimals]);
 
   // --- Approve state ---
@@ -191,7 +222,6 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
       if (needsApprove) throw new Error('Approve required');
 
       setStatus('Staking…');
-      // EXACT signature: stake(uint256 amount, uint32 daysLocked, bool autoCompound)
       const txHash = await writeContractAsync({
         abi: STAKING_STUB_ABI as any,
         address: env.STAKING as `0x${string}`,
@@ -205,6 +235,23 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
     } catch (e: any) {
       setStatus(e?.shortMessage || e?.message || 'Stake failed');
     }
+  }
+
+  // --- UX: why is Stake disabled? ---
+  const canStake =
+    !!parsedAmount && !needsApprove && !!address && !wrongNetwork && env.STAKING_ENABLED;
+
+  let stakeHint = '';
+  if (!address) {
+    stakeHint = 'Connect your wallet to open a vault.';
+  } else if (wrongNetwork) {
+    stakeHint = 'Switch network to Base (chain ID 8453) in your wallet.';
+  } else if (!parsedAmount) {
+    stakeHint = 'Enter how much BGLD you want to stake.';
+  } else if (needsApprove) {
+    stakeHint = 'Step 1: Approve BGLD, then click Stake.';
+  } else if (!env.STAKING_ENABLED) {
+    stakeHint = 'Staking is temporarily paused while we update parameters.';
   }
 
   return (
@@ -222,14 +269,13 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
           Live BGLD Price <span className="text-white/50">(via Dexscreener)</span>
         </div>
         <div className="text-amber-200 text-lg font-semibold">
-  {priceUsd
-    ? `$${priceUsd.toLocaleString(undefined, {
-        minimumFractionDigits: 6,
-        maximumFractionDigits: 8,
-      })}`
-    : '—'}
-</div>
-
+          {priceUsd
+            ? `$${priceUsd.toLocaleString(undefined, {
+                minimumFractionDigits: 6,
+                maximumFractionDigits: 8,
+              })}`
+            : '—'}
+        </div>
       </div>
 
       {/* Wallet balance line */}
@@ -239,10 +285,16 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
           {formatUnits(walletBgld, bgldDecimals)} BGLD
         </span>
         {priceUsd ? (
-          <span className="text-white/50"> &nbsp;(
+          <span className="text-white/50">
+            {' '}
+            (
             {fmtUsd(walletBgldNum * priceUsd)}
-            )</span>
+            )
+          </span>
         ) : null}
+        {readsLoading && (
+          <span className="ml-2 text-[10px] text-white/40">syncing…</span>
+        )}
       </div>
 
       {/* Amount */}
@@ -285,7 +337,7 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
         <div className="mt-1 text-xs text-white/60">Wallet: {walletDisplay} BGLD</div>
       </div>
 
-      {/* Preview stats (terminal cards) */}
+      {/* Preview stats */}
       <div className="mt-6 grid gap-3 md:grid-cols-3">
         <div className="rounded-xl border border-white/10 bg-black/40 p-3">
           <div className="text-xs text-white/60">Est. APR</div>
@@ -307,7 +359,7 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
 
       {/* Auto-compound */}
       <div className="mt-6 rounded-2xl border border-white/10 bg-black/40 p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-amber-200 font-semibold">Auto-Compound</div>
             <div className="text-sm text-white/70">
@@ -342,13 +394,24 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
 
         <button
           type="button"
-          disabled={!parsedAmount || needsApprove || !env.STAKING_ENABLED || wrongNetwork}
+          disabled={!canStake}
           onClick={onStake}
           className="rounded-xl px-4 py-2 border border-emerald-400 text-emerald-200 bg-black/40 hover:bg-emerald-400/10 disabled:opacity-50 transition"
         >
           Stake
         </button>
       </div>
+
+      {/* Why is stake disabled / connection tips */}
+      {stakeHint && (
+        <div className="mt-2 text-[11px] text-white/55">
+          {stakeHint}{' '}
+          <span className="text-white/35">
+            If you’re using the Base app browser and nothing happens, try opening this
+            site in Safari/Chrome and connecting there.
+          </span>
+        </div>
+      )}
 
       {/* Footnote */}
       <div className="mt-4 text-[11px] text-white/45 italic">

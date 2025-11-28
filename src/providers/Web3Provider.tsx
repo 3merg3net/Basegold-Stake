@@ -41,7 +41,7 @@ if (process.env.NODE_ENV !== 'production') {
   }
 }
 
-// RainbowKit + wagmi config (handles connectors internally)
+// RainbowKit + wagmi config
 const config = getDefaultConfig({
   appName: 'Base Gold',
   projectId: WC_PROJECT_ID,
@@ -58,7 +58,10 @@ export function Web3Provider({ children }: { children: ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider theme={lightTheme({ overlayBlur: 'small' })}>
+        <RainbowKitProvider
+          theme={lightTheme({ overlayBlur: 'small' })}
+          initialChain={TARGET_CHAIN}   // 👈 ensures we’re always on Base / Base Sepolia
+        >
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>
