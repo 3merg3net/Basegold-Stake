@@ -30,18 +30,18 @@ if (process.env.NODE_ENV !== 'production') {
   if (!process.env.NEXT_PUBLIC_WALLETCONNECT_ID || WC_PROJECT_ID === 'demo') {
     // eslint-disable-next-line no-console
     console.warn(
-      '[Web3] Using demo WalletConnect ID. Set NEXT_PUBLIC_WALLETCONNECT_ID for production.'
+      '[Web3] Using demo WalletConnect ID. Set NEXT_PUBLIC_WALLETCONNECT_ID for production.',
     );
   }
   if (!process.env.NEXT_PUBLIC_RPC_URL) {
     // eslint-disable-next-line no-console
     console.warn(
-      '[Web3] Using default RPC. Set NEXT_PUBLIC_RPC_URL to your Base RPC.'
+      '[Web3] Using default RPC. Set NEXT_PUBLIC_RPC_URL to your Base RPC.',
     );
   }
 }
 
-// RainbowKit + wagmi config
+// RainbowKit + wagmi config (handles connectors internally)
 const config = getDefaultConfig({
   appName: 'Base Gold',
   projectId: WC_PROJECT_ID,
@@ -58,10 +58,7 @@ export function Web3Provider({ children }: { children: ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider
-          theme={lightTheme({ overlayBlur: 'small' })}
-          initialChain={TARGET_CHAIN}   // 👈 ensures we’re always on Base / Base Sepolia
-        >
+        <RainbowKitProvider theme={lightTheme({ overlayBlur: 'small' })}>
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>
