@@ -79,7 +79,11 @@ function fmtNum(n?: number, digits = 2) {
 }
 function fmtUsd(n?: number) {
   if (!Number.isFinite(n!)) return '—';
-  return n!.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+  return n!.toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 2,
+  });
 }
 
 // --- APR curve used across app (matches calculator) ---
@@ -95,14 +99,17 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
 
   const [amount, setAmount] = useState<string>('');
   const [days, setDays] = useState<number>(clampDays(initialLockDays));
-  const [autoCompound, setAutoCompound] = useState<boolean>(false);
   const [status, setStatus] = useState<string>('');
 
   // Live BGLD/USD via your hook (backed by /api/gold)
   const priceUsd = useBgldPrice();
 
   // --- Reads: ERC20 (decimals, balance, allowance) + Pool (slot0/token0/token1) ---
-  const { data: reads, refetch: refetchReads, isLoading: readsLoading } = useReadContracts({
+  const {
+    data: reads,
+    refetch: refetchReads,
+    isLoading: readsLoading,
+  } = useReadContracts({
     allowFailure: true,
     contracts: [
       // ERC20
@@ -226,7 +233,8 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
         abi: STAKING_STUB_ABI as any,
         address: env.STAKING as `0x${string}`,
         functionName: 'stake',
-        args: [parsedAmount, Number(days), Boolean(autoCompound)],
+        // autoCompound set to false for all new V1 stakes
+        args: [parsedAmount, Number(days), false],
         chainId: env.CHAIN_ID,
       });
       setStatus(`Stake submitted: ${txHash.slice(0, 10)}…`);
@@ -263,6 +271,19 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
         </div>
       )}
 
+      {/* V2 migration notice */}
+      <div className="mb-3 rounded-xl border border-amber-300/30 bg-black/50 px-3 py-3 text-xs text-amber-100">
+        <div className="font-semibold text-amber-300 text-sm mb-0.5">
+          Heads up: V2 staking upgrade in progress
+        </div>
+        <p className="leading-relaxed">
+          This page interacts with the current V1 staking contract. A final V2 vault with
+          updated mechanics is being prepared, and a liquidity migration date will be
+          announced soon. You can continue to open V1 vaults or wait for V2—
+          always DYOR and choose what fits your risk.
+        </p>
+      </div>
+
       {/* Terminal header row */}
       <div className="mb-3 flex items-center justify-between rounded-2xl border border-amber-300/30 bg-black/40 px-4 py-3">
         <div className="text-white/80 text-sm">
@@ -287,9 +308,7 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
         {priceUsd ? (
           <span className="text-white/50">
             {' '}
-            (
-            {fmtUsd(walletBgldNum * priceUsd)}
-            )
+            ({fmtUsd(walletBgldNum * priceUsd)})
           </span>
         ) : null}
         {readsLoading && (
@@ -340,11 +359,13 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
       {/* Preview stats */}
       <div className="mt-6 grid gap-3 md:grid-cols-3">
         <div className="rounded-xl border border-white/10 bg-black/40 p-3">
-          <div className="text-xs text-white/60">Est. APR</div>
-          <div className="text-amber-200 text-xl font-semibold">{fmtNum(apr, 1)}%</div>
+          <div className="text-xs text-white/60">Est. APR (V1)</div>
+          <div className="text-amber-200 text-xl font-semibold">
+            {fmtNum(apr, 1)}%
+          </div>
         </div>
         <div className="rounded-xl border border-white/10 bg-black/40 p-3">
-          <div className="text-xs text-white/60">Projected Reward</div>
+          <div className="text-xs text-white/60">Projected Reward over term</div>
           <div className="text-amber-200 text-xl font-semibold">
             {fmtNum(estRewardBgld, 2)} BGLD
           </div>
@@ -354,26 +375,6 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
           <div className="text-emerald-200 text-xl font-semibold">
             {priceUsd ? fmtUsd(estRewardUsd) : '—'}
           </div>
-        </div>
-      </div>
-
-      {/* Auto-compound */}
-      <div className="mt-6 rounded-2xl border border-white/10 bg-black/40 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-amber-200 font-semibold">Auto-Compound</div>
-            <div className="text-sm text-white/70">
-              Rewards roll into principal and the lock restarts (runs every 48h when enabled).
-            </div>
-          </div>
-          <label className="inline-flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={autoCompound}
-              onChange={(e) => setAutoCompound(e.target.checked)}
-            />
-            <span className="text-white/80">Enable</span>
-          </label>
         </div>
       </div>
 
@@ -398,7 +399,7 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
           onClick={onStake}
           className="rounded-xl px-4 py-2 border border-emerald-400 text-emerald-200 bg-black/40 hover:bg-emerald-400/10 disabled:opacity-50 transition"
         >
-          Stake
+          Stake (V1)
         </button>
       </div>
 
@@ -407,15 +408,16 @@ export default function StakeForm({ className, initialLockDays = 7 }: Props) {
         <div className="mt-2 text-[11px] text-white/55">
           {stakeHint}{' '}
           <span className="text-white/35">
-            If you’re using the Base app browser and nothing happens, try opening this
-            site in Safari/Chrome and connecting there.
+            If you&apos;re using the Base app browser and nothing happens,
+            try opening this site in Safari/Chrome and connecting there.
           </span>
         </div>
       )}
 
-      {/* Footnote */}
+      {/* Footnote – updated, no compounding language */}
       <div className="mt-4 text-[11px] text-white/45 italic">
-        “Every compound reinforces the Reserve.”
+        Base Gold is evolving. V2 staking details and liquidity migration timing will
+        be shared publicly before any changes go live.
       </div>
     </div>
   );

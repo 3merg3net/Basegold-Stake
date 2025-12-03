@@ -87,6 +87,19 @@ export default function HomePage() {
     <main className="min-h-screen bg-gradient-to-t from-black via-[#050608] to-black text-white">
       {/* Hero */}
       <section className="text-center pt-16 md:pt-20 pb-10 px-5">
+        {/* V2 upgrade notice */}
+        <div className="mx-auto mb-5 max-w-2xl rounded-2xl border border-amber-300/30 bg-black/60 px-4 py-3 text-xs sm:text-sm text-amber-100">
+          <div className="font-semibold text-amber-300 mb-0.5">
+            Base Gold V2 vault is in progress
+          </div>
+          <p className="text-amber-100/90">
+            Current vaults run on the V1 staking contract. A simplified V2 with
+            updated mechanics and dynamic APR will be announced, along with a
+            clear liquidity migration date. You can stake now in V1 or wait for V2
+            — always choose your own risk.
+          </p>
+        </div>
+
         <motion.h1
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
@@ -106,8 +119,8 @@ export default function HomePage() {
           className="text-base sm:text-lg md:text-xl text-white/70 max-w-3xl mx-auto mt-4 leading-relaxed"
         >
           On-chain <span className="text-amber-300 font-semibold">Gold Staking Vault</span>{' '}
-          on Base. Lock BGLD, earn aggressive yield, and compound into a growing vault
-          that’s fully visible onchain.
+          on Base. Lock BGLD, earn aggressive time-based rewards, and track every
+          position transparently onchain.
         </motion.p>
 
         {/* Primary CTAs */}
@@ -118,7 +131,7 @@ export default function HomePage() {
               href="/stake"
               className="w-full sm:w-auto px-8 py-3.5 bg-amber-300 text-black font-semibold rounded-2xl hover:bg-[#f1d371] transition text-sm sm:text-base shadow-[0_0_20px_rgba(212,175,55,0.25)]"
             >
-              Start Staking — Live Now
+              Open a Vault — V1 Live
             </Link>
 
             {/* Buy on Dexscreener */}
@@ -140,11 +153,11 @@ export default function HomePage() {
             </div>
             <div className="rounded-full border border-white/15 bg-black/50 px-3 py-1.5">
               <span className="text-amber-300 font-semibold mr-1">2.</span>
-              Stake in the Base Gold Vault
+              Lock in a Base Gold vault
             </div>
             <div className="rounded-full border border-white/15 bg-black/50 px-3 py-1.5">
               <span className="text-amber-300 font-semibold mr-1">3.</span>
-              Earn & compound onchain
+              Let time-based rewards accrue onchain
             </div>
           </div>
 
@@ -156,7 +169,7 @@ export default function HomePage() {
           {/* Hype subtext */}
           <p className="mt-4 text-xs sm:text-sm text-white/60">
             Built on <span className="text-[#0AA0FF] font-semibold">Base</span> · Powered by ETH ·
-            Staked in Gold
+            Designed as a digital gold reserve
           </p>
         </div>
       </section>
@@ -190,8 +203,8 @@ export default function HomePage() {
             />
           </div>
           <p className="text-[11px] text-white/50 text-center mt-3">
-            Simulated values only. Actual rewards depend on your lock length and onchain
-            conditions.
+            Simulated values only. Actual rewards depend on lock length and onchain
+            conditions. V2 parameters may differ.
           </p>
         </div>
       </section>
@@ -200,48 +213,38 @@ export default function HomePage() {
       <section className="px-5 pb-16 max-w-5xl mx-auto">
         <div className="rounded-2xl border border-white/10 bg-black/60 p-5 sm:p-6 md:p-8">
           <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-amber-300 text-center sm:text-left">
-            How Staking Works
+            How the Vault Works (V1)
           </h2>
 
           <ol className="list-decimal pl-5 space-y-3 text-sm sm:text-base text-white/80 leading-relaxed">
             <li>
               Choose a lock term from <strong>1–30 days</strong>. Longer locks target higher APR
-              within the posted bounds.
+              within the posted range.
             </li>
             <li>
-              At maturity you can <strong>Withdraw</strong> your principal + vested rewards, or{' '}
-              <strong>Compound</strong> to roll rewards into principal and restart your chosen
-              term.
-            </li>
-            <li>
-              <strong>Manual Compound</strong> is allowed once every 24h.{' '}
-              <em>Each compound restarts the term.</em>
-            </li>
-            <li>
-              <strong>Auto-Compound</strong> can be toggled per vault. While enabled, the protocol
-              compounds on its cadence and <em>each auto-compound restarts the term</em>. You can
-              turn it off anytime in{' '}
+              While your vault is active, rewards in <strong>BGLD</strong> vest continuously across
+              the term. You can monitor your position on the{' '}
               <Link href="/positions" className="underline text-amber-300">
                 Vaults
-              </Link>
-              .
+              </Link>{' '}
+              page.
             </li>
             <li>
-              Exiting early applies a decaying <strong>Early Exit Penalty</strong> on principal and
-              only pays vested rewards. This protects long-term stakers and overall vault health.
+              At maturity, you can <strong>withdraw</strong> your principal plus vested rewards
+              (minus protocol fees), or later choose to open a new vault — including V2 once live.
             </li>
             <li>
-              Protocol fees on withdraw/compound are retained in the system or routed to treasury,
-              reinforcing Base Gold over time.
+              Exiting early applies a time-based penalty to principal and only pays the vested
+              portion of rewards, protecting long-term vault health.
             </li>
           </ol>
 
           <div className="mt-5 rounded-xl border border-amber-300/20 bg-amber-300/5 p-4 text-xs sm:text-sm text-amber-200">
-            <p className="font-semibold mb-1">Signal in plain English</p>
+            <p className="font-semibold mb-1">Upgrade Path</p>
             <p>
-              Rewards vest continuously over your chosen term. Compounding adds vested rewards to
-              principal and <em>restarts</em> the lock. At maturity you choose: withdraw, or
-              compound to keep stacking more BGLD inside the vault.
+              V1 vaults will remain honored onchain. A cleaner V2 contract with updated mechanics
+              will be deployed separately, and total TVL will be shown as a unified number across
+              both until migration is complete.
             </p>
           </div>
         </div>
@@ -252,15 +255,15 @@ export default function HomePage() {
         <div className="grid gap-5 md:gap-6 md:grid-cols-3">
           <FeatureCard
             title="Onchain Gold Vault"
-            desc="Simple terms, transparent math. TVL, rewards, and protocol health are verifiable directly on Base."
+            desc="Simple, time-based vaults with transparent math. TVL and rewards are verifiable directly on Base."
           />
           <FeatureCard
-            title="Compounding Engine"
-            desc="Manual or auto. Every compound rolls vested rewards into principal, amplifying long-term growth."
+            title="Aggressive APR Band"
+            desc="High-yield targets for those willing to lock. V2 will introduce dynamic APR tied to vault conditions."
           />
           <FeatureCard
             title="Base-Native"
-            desc="Low fees, fast finality, and a thriving ecosystem. Perfect for everyday staking and compounding."
+            desc="Low fees, fast finality, and a thriving ecosystem. Built specifically to live and grow on Base."
           />
         </div>
 
@@ -271,7 +274,8 @@ export default function HomePage() {
           </h3>
           <p className="text-sm sm:text-base text-white/70 leading-relaxed">
             Staking involves smart contract and market risk. APR targets can change within posted
-            bounds and are not guaranteed. Only stake what you can afford to lock. Review the{' '}
+            bounds and may be updated for V2. Yields are not guaranteed. Only stake what you can
+            afford to lock, and review the{' '}
             <Link href="/terms" className="underline text-amber-300">
               Terms
             </Link>{' '}

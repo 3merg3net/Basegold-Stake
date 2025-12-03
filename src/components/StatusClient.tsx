@@ -63,7 +63,7 @@ export default function StatusClient() {
       <section className="rounded-2xl border border-amber-300/25 bg-black/50 px-6 py-6 shadow-[0_0_24px_rgba(212,175,55,0.08)] text-center">
         <h3 className="text-lg font-semibold text-amber-300 mb-2">Reserve Outlook</h3>
         <p className="text-white/75">
-          Compounding and disciplined fees continuously reinforce the vault. Protocol-Owned Liquidity aligns Base Gold
+          Staking your BGLD continuously reinforce the vault. Protocol-Owned Liquidity aligns Base Gold
           with long-term stakers — when markets get loud, the Reserve keeps adding weight.
         </p>
       </section>

@@ -16,7 +16,7 @@ export default function DocsPage() {
 
       <h2>Overview</h2>
       <p>
-        Base Gold is a decentralized staking and compounding vault built on the
+        Base Gold is a decentralized staking vault built on the
         <strong> Base </strong> Layer-2 blockchain. It enables users to stake <strong>BGLD</strong>{' '}
         tokens, earn ETH-denominated rewards, and automatically compound them back into liquidity
         for long-term yield amplification.
@@ -28,10 +28,7 @@ export default function DocsPage() {
           <strong>Vault Staking:</strong> Lock your BGLD tokens into the vault for a chosen duration
           (1–30 days). Longer locks yield higher APR multipliers.
         </li>
-        <li>
-          <strong>ETH Compounding:</strong> Staking rewards are distributed in ETH. When compounded,
-          the contract automatically purchases additional BGLD and adds it to your stake position.
-        </li>
+        
         <li>
           <strong>Uniswap V3 Integration:</strong> The vault interacts with a 1% exotic
           full-range pool to maintain deep liquidity and auto-rebalance LP tokens.
@@ -42,20 +39,9 @@ export default function DocsPage() {
         </li>
       </ul>
 
-      <h2>Compounding Logic</h2>
-      <p>
-        When you trigger <code>Compound()</code>, your earned ETH rewards are used to market-buy
-        BGLD and add them to the LP stake. This auto-compounding effect steadily increases your
-        position over time without requiring manual claims.
-      </p>
+      
 
-      <h2>Smart Contract Architecture</h2>
-      <ul>
-        <li><strong>Vault.sol</strong> – Handles deposits, withdrawals, and reward tracking.</li>
-        <li><strong>Compounder.sol</strong> – Executes ETH → BGLD swaps and LP restakes.</li>
-        <li><strong>ReserveVault.sol</strong> – Manages protocol fee collection.</li>
-        <li><strong>ERC20.sol</strong> – Implements the BGLD token standard (1B total supply).</li>
-      </ul>
+      
 
       <h2>Audit & Security</h2>
       <p>
@@ -69,7 +55,7 @@ export default function DocsPage() {
         <li>Connect your wallet (MetaMask, Rainbow, or Coinbase Wallet).</li>
         <li>Stake BGLD in the vault UI.</li>
         <li>Select your preferred lock duration (1–30 days).</li>
-        <li>Compound rewards periodically or let them auto-stake.</li>
+        
       </ol>
 
       <h2>Governance</h2>
