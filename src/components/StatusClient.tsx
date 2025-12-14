@@ -39,19 +39,7 @@ export default function StatusClient() {
         <StatusStats />
       </section>
 
-      {/* ===== Reserve Pulse (compact calculator) ===== */}
-      <section className="max-w-md mx-auto mb-12">
-        <div className="rounded-2xl border border-amber-300/30 bg-black/50 px-5 py-5 backdrop-blur shadow-[0_0_24px_rgba(212,175,55,0.08)]">
-          <h3 className="text-lg font-semibold text-amber-300 mb-2 text-center">Base Reserve Vault Pulse Simulator</h3>
-          <p className="text-white/70 text-center mb-4 text-sm">
-            Watch simulated Estimate potential rewards using current Dexscreener pricing.
-          </p>
-          <GoldCalculator mode="compact" />
-          <div className="mt-3 text-center text-xs text-white/50">
-            Pricing via Dexscreener · Estimates only
-          </div>
-        </div>
-      </section>
+      
 
       {/* ===== Protocol Settings (static, no extra APIs) ===== */}
       <section className="grid gap-6 md:grid-cols-2 mb-12">
@@ -164,11 +152,9 @@ function ProtocolSettingsCard() {
     <div className="rounded-2xl border border-white/12 bg-black/40 px-5 py-5">
       <h3 className="text-lg font-semibold text-amber-300 mb-2">Protocol Settings</h3>
       <div className="grid gap-3 sm:grid-cols-2">
-        <KV label="Compound Fee">1%</KV>
+        
         <KV label="Withdraw Fee (at maturity)">2%</KV>
-        <KV label="Manual Compound">Every 24h (restarts lock)</KV>
-        <KV label="Auto-Compound">Every 48h (restarts lock)</KV>
-        <KV label="APR Range">~10% → 1200%</KV>
+        <KV label="APR Range">~10% → 600%</KV>
         <KV label="Chain">Base (8453)</KV>
       </div>
       <div className="mt-3 text-sm">

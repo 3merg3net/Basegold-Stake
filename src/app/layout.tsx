@@ -66,16 +66,21 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           {/* ===== GLOBAL V2 ANNOUNCEMENT BANNER ===== */}
 <div className="w-full bg-gradient-to-r from-amber-300/10 via-amber-300/20 to-amber-300/10 border-b border-amber-300/30 backdrop-blur-md py-3 px-4 text-center">
   <p className="text-[13px] md:text-sm text-amber-200 leading-snug font-medium">
-    <span className="font-bold text-amber-300">BASE GOLD RESERVE UPGRADE:</span>
-    &nbsp;V2 Vaults are coming soon. A liquidity migration date will be announced shortly.
-    All V1 vaults — especially those with legacy auto-compound settings —
-    will need to exit and migrate to the new vault system when V2 launches.
+    <span className="font-bold text-amber-300">BASE GOLD RESERVE UPDATE:</span>
+    &nbsp;Vault parameters have been refined to strengthen long-term sustainability as we prepare
+    the next evolution of the Base Gold Reserve.
     <br className="hidden sm:block" />
-    <span className="text-amber-300 font-semibold">
-      This is a bullish upgrade designed to strengthen long-term sustainability and deepen the Reserve.
+    <span className="text-amber-300 font-semibold">V2 Vaults</span> will introduce longer lock options,
+    enhanced reward structures, and integrated casino incentives —
+    designed to reward long-term conviction.
+    <br className="hidden sm:block" />
+    <span className="text-white/80">
+      Staking remains live. Existing vaults continue normally.
+      More details on V2 will be announced ahead of launch.
     </span>
   </p>
 </div>
+
 
           <Header />
           <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-24 pt-4 relative z-10">

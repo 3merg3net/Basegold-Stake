@@ -55,21 +55,7 @@ export default function TermsPage() {
         </div>
       </section>
 
-      {/* Compact calculator */}
-      <section className="mb-10">
-        <div className="rounded-2xl border border-amber-300/30 bg-black/50 backdrop-blur px-5 py-5 shadow-[0_0_24px_rgba(212,175,55,0.08)]">
-          <h2 className="text-lg font-semibold text-amber-300 mb-2 text-center">
-            Quick Vault Rewards Estimator
-          </h2>
-          <p className="text-white/70 text-center mb-4 text-sm">
-            Live estimates using current Dexscreener pricing. Values update automatically
-            and are for illustration only.
-          </p>
-          <div className="max-w-md mx-auto">
-            <GoldCalculator mode="compact" />
-          </div>
-        </div>
-      </section>
+      
 
       {/* Terms content */}
       <section className="space-y-8 leading-relaxed text-white/80">

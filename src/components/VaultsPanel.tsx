@@ -72,10 +72,10 @@ const STAKING_ABI: any = [
   },
 ];
 
-/* ───────── Local APR / term helpers (mirror V1 contract logic) ───────── */
-// V1 defaults: 10% → 1200% in basis points
+// V1 (current): 10% → 600% in basis points
 const APR_MIN_BPS = 10 * 100;
-const APR_MAX_BPS = 1200 * 100;
+const APR_MAX_BPS = 600 * 100;
+
 
 function aprForDaysLocal(daysLocked: number): number {
   if (daysLocked <= 1) return APR_MIN_BPS;

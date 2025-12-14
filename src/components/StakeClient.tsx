@@ -1,12 +1,20 @@
 'use client';
 
+import { useEffect, useMemo } from 'react';
 import { useStaking } from '@/hooks/useStaking';
 import { formatUnits } from 'viem';
 import Link from 'next/link';
 
+function txUrl(chainId?: number, txHash?: string) {
+  if (!chainId || !txHash) return undefined;
+  if (chainId === 8453) return `https://basescan.org/tx/${txHash}`;
+  if (chainId === 84532) return `https://sepolia.basescan.org/tx/${txHash}`;
+  return undefined;
+}
+
 export default function StakeClient() {
   const {
-    isConnected, chainId, address,
+    isConnected, chainId,
     amount, setAmount,
     days, setDays,
     auto, setAuto,
@@ -16,14 +24,35 @@ export default function StakeClient() {
     isPending, txHash,
   } = useStaking();
 
+  // Force auto = false (no UI, no surprises)
+  useEffect(() => {
+    if (auto) setAuto(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto]);
+
+  const chainLabel = useMemo(() => {
+    if (!chainId) return '—';
+    if (chainId === 8453) return 'Base';
+    if (chainId === 84532) return 'Base Sepolia';
+    return `Chain ${chainId}`;
+  }, [chainId]);
+
+  const explorer = txUrl(chainId, txHash);
+
   return (
     <div className="grid gap-6 md:grid-cols-2">
       {/* Stake form */}
       <div className="rounded-2xl border border-white/10 bg-black/40 p-6">
-        <h2 className="text-xl font-semibold">Stake BGLD (Sepolia)</h2>
+        <h2 className="text-xl font-semibold">Stake BGLD</h2>
         <p className="text-white/70 text-sm mt-1">
-          Chain ID: {chainId ?? '—'} {isConnected ? '• connected' : '• connect wallet'}
+          Network: {chainLabel} {isConnected ? '• connected' : '• connect wallet'}
         </p>
+
+        <div className="mt-5 rounded-xl border border-amber-300/20 bg-amber-300/5 p-4 text-xs text-amber-100/90 leading-relaxed">
+          <span className="font-semibold text-amber-300">V2 is coming:</span>{' '}
+          V1 remains live and honored onchain. V2 will introduce longer-term incentives and Base Gold Rush alignment.
+          If you prefer maximum V2 upside, consider waiting or using a smaller test vault today.
+        </div>
 
         <div className="mt-6 space-y-4">
           <label className="block">
@@ -35,7 +64,10 @@ export default function StakeClient() {
               onChange={(e) => setAmount(e.target.value)}
             />
             <div className="mt-1 text-xs text-white/60">
-              Balance: {balance !== undefined ? Number(formatUnits(balance, 18)).toLocaleString() : '—'}
+              Balance:{' '}
+              {balance !== undefined
+                ? Number(formatUnits(balance, 18)).toLocaleString()
+                : '—'}
             </div>
           </label>
 
@@ -50,12 +82,9 @@ export default function StakeClient() {
               onChange={(e) => setDays(Number(e.target.value))}
               className="mt-2 w-full"
             />
-            <div className="mt-1 text-xs text-white/60">Selected: {days} day(s)</div>
-          </label>
-
-          <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
-            <span className="text-sm text-white/80">Auto-compound rewards</span>
+            <div className="mt-1 text-xs text-white/60">
+              Selected: {days} day(s)
+            </div>
           </label>
 
           <div className="mt-4 flex gap-3">
@@ -77,9 +106,9 @@ export default function StakeClient() {
               </button>
             )}
 
-            {txHash && (
+            {explorer && (
               <a
-                href={`https://sepolia.basescan.org/tx/${txHash}`}
+                href={explorer}
                 target="_blank"
                 rel="noreferrer"
                 className="rounded-lg border border-white/20 px-4 py-2 text-sm hover:bg-white/10"
@@ -90,7 +119,10 @@ export default function StakeClient() {
           </div>
 
           <div className="mt-3 text-xs text-white/60">
-            Allowance: {allowance !== undefined ? Number(formatUnits(allowance, 18)).toLocaleString() : '—'}
+            Allowance:{' '}
+            {allowance !== undefined
+              ? Number(formatUnits(allowance, 18)).toLocaleString()
+              : '—'}
           </div>
         </div>
       </div>
@@ -103,12 +135,21 @@ export default function StakeClient() {
         <div className="mt-4 space-y-2">
           {ids.length === 0 ? (
             <div className="text-white/60 text-sm">
-              No positions yet. After staking, check the <Link href="/positions" className="underline">Positions</Link> page for details.
+              No positions yet. After staking, check the{' '}
+              <Link href="/positions" className="underline">
+                Vaults
+              </Link>{' '}
+              page for details.
             </div>
           ) : (
             <ul className="list-disc pl-5 text-sm text-white/80">
               {ids.map((id) => (
-                <li key={id.toString()}>Position #{id.toString()} — <Link href="/positions" className="underline">view</Link></li>
+                <li key={id.toString()}>
+                  Vault #{id.toString()} —{' '}
+                  <Link href="/positions" className="underline">
+                    view
+                  </Link>
+                </li>
               ))}
             </ul>
           )}

@@ -87,11 +87,12 @@ function fmtUsd(n?: number) {
 }
 
 // --- APR curve used across app (matches calculator) ---
+// Updated to match new V1 bounds: ~10% → ~600%
 function getAPR(days: number): number {
   if (days <= 5) return 10 + (days - 1) * 7.5; // 10–40%
   if (days <= 14) return 100 + (days - 6) * 25; // 100–300%
-  const extra = Math.max(0, days - 15); // 15–30 → 400–1200%
-  return 400 + extra * 53.3;
+  const extra = Math.max(0, days - 15); // 15–30 → 400–600%
+  return 400 + extra * 13.3333333333;
 }
 
 export default function StakeForm({ className, initialLockDays = 7 }: Props) {
