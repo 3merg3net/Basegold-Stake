@@ -1,7 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useAccount, useReadContracts, useWriteContract } from 'wagmi';
+import { useMemo, useState } from 'react';
+import {
+  useAccount,
+  useReadContracts,
+  useWriteContract,
+  usePublicClient,
+} from 'wagmi';
 import { formatUnits } from 'viem';
 import { useBgldPrice } from '@/hooks/useBgldPrice';
 
@@ -55,7 +60,7 @@ const STAKING_ABI: any = [
     outputs: [{ type: 'uint32' }],
   },
 
-  // actions (compound + setAutoCompound intentionally not used in UI)
+  // actions
   {
     type: 'function',
     name: 'withdraw',
@@ -76,14 +81,12 @@ const STAKING_ABI: any = [
 const APR_MIN_BPS = 10 * 100;
 const APR_MAX_BPS = 600 * 100;
 
-
 function aprForDaysLocal(daysLocked: number): number {
   if (daysLocked <= 1) return APR_MIN_BPS;
   if (daysLocked >= 30) return APR_MAX_BPS;
   const minApr = APR_MIN_BPS;
   const maxApr = APR_MAX_BPS;
-  const apr =
-    minApr + ((maxApr - minApr) * (daysLocked - 1)) / (30 - 1);
+  const apr = minApr + ((maxApr - minApr) * (daysLocked - 1)) / (30 - 1);
   return Math.round(apr);
 }
 
@@ -126,11 +129,42 @@ function secsToDHMS(secsNum: number) {
   return d > 0 ? `${d}d ${h}h` : `${h}h ${m}m`;
 }
 
+function friendlyTxError(e: any): string {
+  // viem/wagmi often provide shortMessage
+  const msg =
+    e?.shortMessage ||
+    e?.message ||
+    (typeof e === 'string' ? e : 'Transaction failed');
+
+  // Common cases you’ll see:
+  // - User rejected request
+  if (/user rejected|denied|rejected/i.test(msg)) return 'Transaction cancelled.';
+
+  // - Not matured / revert
+  if (/revert|execution reverted/i.test(msg)) {
+    return 'Transaction reverted. If the vault is not fully matured, try Emergency Exit or wait until maturity.';
+  }
+
+  // - the specific issue
+  if (/intrinsic gas too low|gas 0/i.test(msg)) {
+    return 'Your wallet failed to estimate gas and tried to submit with gas=0. Please try again, or use another wallet (MetaMask/Coinbase).';
+  }
+
+  return msg;
+}
+
 /* ───────── Component ───────── */
 export default function VaultsPanel({ className }: { className?: string }) {
-  const { address } = useAccount();
+  const { address, chain } = useAccount();
   const enabled = Boolean(address && env.STAKING);
+
   const priceUsd = useBgldPrice();
+  const publicClient = usePublicClient({ chainId: env.CHAIN_ID });
+
+  const [pendingId, setPendingId] = useState<bigint | null>(null);
+  const [pendingFn, setPendingFn] = useState<'withdraw' | 'emergencyExit' | null>(
+    null,
+  );
 
   const toUsd = (bgld: bigint, decimals = 18) => {
     if (!priceUsd) return undefined;
@@ -307,32 +341,72 @@ export default function VaultsPanel({ className }: { className?: string }) {
 
   const { writeContractAsync } = useWriteContract();
 
-  async function doAction(
-    fn: 'withdraw' | 'emergencyExit',
-    id: bigint,
-  ) {
-    const tx = await writeContractAsync({
-      abi: STAKING_ABI,
-      address: env.STAKING as `0x${string}`,
-      functionName: fn,
-      args: [id],
-      chainId: env.CHAIN_ID,
-    });
-    setTimeout(() => {
-      refetchPos();
-      refetchIds();
-    }, 1500);
-    return tx;
+  async function doAction(fn: 'withdraw' | 'emergencyExit', id: bigint) {
+    if (!address) throw new Error('Wallet not connected');
+    if (!env.STAKING) throw new Error('Missing staking contract address');
+    if (!publicClient) throw new Error('Public client not ready');
+
+    // Optional safety: if user connected wrong chain, give a friendlier error
+    if (chain?.id && chain.id !== env.CHAIN_ID) {
+      throw new Error(
+        `Wrong network selected. Please switch to chainId ${env.CHAIN_ID} and try again.`,
+      );
+    }
+
+    setPendingId(id);
+    setPendingFn(fn);
+
+    try {
+      // ✅ Force gas estimation in-app (fixes Zerion/WC “gas 0”)
+      const estimatedGas = await publicClient.estimateContractGas({
+        abi: STAKING_ABI,
+        address: env.STAKING as `0x${string}`,
+        functionName: fn,
+        args: [id],
+        account: address as `0x${string}`,
+      });
+
+      // Add buffer
+      const gas = (estimatedGas * 120n) / 100n;
+
+      const tx = await writeContractAsync({
+        abi: STAKING_ABI,
+        address: env.STAKING as `0x${string}`,
+        functionName: fn,
+        args: [id],
+        chainId: env.CHAIN_ID,
+        gas,
+      });
+
+      // refresh reads after wallet broadcast
+      setTimeout(() => {
+        refetchPos();
+        refetchIds();
+      }, 1500);
+
+      return tx;
+    } catch (e: any) {
+      // surface helpful message to user
+      const msg = friendlyTxError(e);
+      // eslint-disable-next-line no-alert
+      alert(msg);
+      throw e;
+    } finally {
+      setPendingId(null);
+      setPendingFn(null);
+    }
   }
 
-  const loading = enabled && (idsLoading || idsFetching || posLoading || posFetching);
+  const loading =
+    enabled && (idsLoading || idsFetching || posLoading || posFetching);
 
   /* ───────── Empty / loading states ───────── */
   if (!enabled) {
     return (
       <div className={className}>
         <div className="rounded-2xl border border-white/12 bg-black/50 p-5 text-white/70">
-          Connect a Base-compatible wallet to view any BGLD vaults linked to this address.
+          Connect a Base-compatible wallet to view any BGLD vaults linked to this
+          address.
         </div>
       </div>
     );
@@ -347,7 +421,8 @@ export default function VaultsPanel({ className }: { className?: string }) {
               Scanning Base for your vaults…
             </div>
             <div className="text-xs text-white/50 mt-1">
-              Reading positions directly from the staking contract. This may take a few seconds if you have many vaults.
+              Reading positions directly from the staking contract. This may
+              take a few seconds if you have many vaults.
             </div>
           </div>
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-300 border-t-transparent" />
@@ -360,8 +435,9 @@ export default function VaultsPanel({ className }: { className?: string }) {
     return (
       <div className={className}>
         <div className="rounded-2xl border border-white/12 bg-black/50 p-5 text-white/70 text-sm">
-          No active vaults found for this wallet. Existing V1 stakes will remain visible here
-          until they are withdrawn or exited as we prepare the migration to the new V2 vault.
+          No active vaults found for this wallet. Existing V1 stakes will remain
+          visible here until they are withdrawn or exited as we prepare the
+          migration to the new V2 vault.
         </div>
       </div>
     );
@@ -409,9 +485,7 @@ export default function VaultsPanel({ className }: { className?: string }) {
           <div className="mt-0.5 text-sm font-semibold text-white/80">
             Live from Base
           </div>
-          <div className="text-[11px] text-white/45">
-            Updates ~ every 15s
-          </div>
+          <div className="text-[11px] text-white/45">Updates ~ every 15s</div>
         </div>
       </div>
 
@@ -427,9 +501,9 @@ export default function VaultsPanel({ className }: { className?: string }) {
           const termSecNum = Number(termSec);
           const elapsed = Math.max(0, termSecNum - remainingSec);
           const progress =
-            termSecNum > 0
-              ? Math.min(100, Math.floor((elapsed / termSecNum) * 100))
-              : 0;
+            termSecNum > 0 ? Math.min(100, Math.floor((elapsed / termSecNum) * 100)) : 0;
+
+          const isPending = pendingId === r.id;
 
           return (
             <div
@@ -439,13 +513,9 @@ export default function VaultsPanel({ className }: { className?: string }) {
               {/* Header row */}
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="text-sm text-white/70">
-                  <span className="text-white/90">
-                    Vault #{String(r.id)}
-                  </span>
+                  <span className="text-white/90">Vault #{String(r.id)}</span>
                   <span className="mx-2 text-white/40">•</span>
-                  <span className="text-white/60">
-                    Lock {r.daysLocked}d
-                  </span>
+                  <span className="text-white/60">Lock {r.daysLocked}d</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1 text-xs text-amber-200">
@@ -473,14 +543,8 @@ export default function VaultsPanel({ className }: { className?: string }) {
                 />
               </div>
               <div className="mt-1 flex flex-col sm:flex-row sm:justify-between text-[11px] text-white/50 gap-1">
-                <span>
-                  Started:{' '}
-                  {new Date(Number(r.start) * 1000).toLocaleString()}
-                </span>
-                <span>
-                  Ends:{' '}
-                  {new Date(Number(end) * 1000).toLocaleString()}
-                </span>
+                <span>Started: {new Date(Number(r.start) * 1000).toLocaleString()}</span>
+                <span>Ends: {new Date(Number(end) * 1000).toLocaleString()}</span>
               </div>
 
               {/* Metrics grid */}
@@ -488,71 +552,60 @@ export default function VaultsPanel({ className }: { className?: string }) {
                 <Metric
                   label="Principal"
                   value={`${fmtBgld(r.amount, 18, 4)} BGLD${
-                    priceUsd && toUsd(r.amount)
-                      ? ` · ${moneyFmt(toUsd(r.amount)!, 2)}`
-                      : ''
+                    priceUsd && toUsd(r.amount) ? ` · ${moneyFmt(toUsd(r.amount)!, 2)}` : ''
                   }`}
                 />
                 <Metric
                   label="Vested Rewards"
                   value={`${fmtBgld(r.vested, 18, 4)} BGLD${
-                    priceUsd && toUsd(r.vested)
-                      ? ` · ${moneyFmt(toUsd(r.vested)!, 2)}`
-                      : ''
+                    priceUsd && toUsd(r.vested) ? ` · ${moneyFmt(toUsd(r.vested)!, 2)}` : ''
                   }`}
                 />
                 <Metric
                   label="Total Rewards"
                   value={`${fmtBgld(r.total, 18, 4)} BGLD${
-                    priceUsd && toUsd(r.total)
-                      ? ` · ${moneyFmt(toUsd(r.total)!, 2)}`
-                      : ''
+                    priceUsd && toUsd(r.total) ? ` · ${moneyFmt(toUsd(r.total)!, 2)}` : ''
                   }`}
                 />
-                <Metric
-                  label="Exit Fee (now)"
-                  value={`${(r.exitFeeBps / 100).toFixed(2)}%`}
-                />
-                <Metric
-                  label="Remaining"
-                  value={secsToDHMS(remainingSec)}
-                />
-                <Metric
-                  label="Status"
-                  value={r.closed ? 'Closed' : 'Active'}
-                />
+                <Metric label="Exit Fee (now)" value={`${(r.exitFeeBps / 100).toFixed(2)}%`} />
+                <Metric label="Remaining" value={secsToDHMS(remainingSec)} />
+                <Metric label="Status" value={r.closed ? 'Closed' : 'Active'} />
 
-                {/* Inline disclaimer (no compound language) */}
+                {/* Inline disclaimer */}
                 <div className="col-span-2 sm:col-span-2 rounded-xl border border-white/10 bg-black/40 p-3">
                   <p className="text-[11px] leading-relaxed text-white/55">
-                    <span className="text-white/70 font-semibold">
-                      Reminder:
-                    </span>{' '}
+                    <span className="text-white/70 font-semibold">Reminder:</span>{' '}
                     Early exit applies a decaying penalty from
                     <span className="text-amber-200"> 10%</span> down to{' '}
-                    <span className="text-amber-200">1%</span> as maturity
-                    approaches. Withdrawals at maturity incur a{' '}
-                    <span className="text-amber-200">2%</span> fee on
-                    principal + vested rewards. Always verify final values
-                    in your wallet before confirming a transaction.
+                    <span className="text-amber-200">1%</span> as maturity approaches.
+                    Withdrawals at maturity incur a{' '}
+                    <span className="text-amber-200">2%</span> fee on principal + vested
+                    rewards. Always verify final values in your wallet before confirming a
+                    transaction.
                   </p>
                 </div>
               </div>
 
-              {/* Actions — no compound, no auto-toggle */}
+              {/* Actions */}
               {!r.closed && (
                 <div className="mt-4 grid grid-cols-2 sm:grid-cols-2 gap-2">
                   <button
+                    disabled={isPending}
                     onClick={() => doAction('withdraw', r.id)}
-                    className="rounded-xl px-3 py-2 border border-emerald-400 text-emerald-200 bg-black/40 hover:bg-emerald-400/10"
+                    className={`rounded-xl px-3 py-2 border border-emerald-400 text-emerald-200 bg-black/40 hover:bg-emerald-400/10 ${
+                      isPending ? 'opacity-60 cursor-not-allowed' : ''
+                    }`}
                   >
-                    Withdraw at Maturity
+                    {isPending && pendingFn === 'withdraw' ? 'Withdrawing…' : 'Withdraw at Maturity'}
                   </button>
                   <button
+                    disabled={isPending}
                     onClick={() => doAction('emergencyExit', r.id)}
-                    className="rounded-xl px-3 py-2 border border-red-400 text-red-200 bg-black/40 hover:bg-red-400/10"
+                    className={`rounded-xl px-3 py-2 border border-red-400 text-red-200 bg-black/40 hover:bg-red-400/10 ${
+                      isPending ? 'opacity-60 cursor-not-allowed' : ''
+                    }`}
                   >
-                    Emergency Exit
+                    {isPending && pendingFn === 'emergencyExit' ? 'Exiting…' : 'Emergency Exit'}
                   </button>
                 </div>
               )}

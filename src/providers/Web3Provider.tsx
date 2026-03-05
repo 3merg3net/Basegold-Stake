@@ -19,11 +19,7 @@ const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WALLETCONNECT_ID || 'demo';
 
 // Pick the chain based on env
 const TARGET_CHAIN =
-  RAW_CHAIN_ID === base.id
-    ? base
-    : RAW_CHAIN_ID === baseSepolia.id
-    ? baseSepolia
-    : baseSepolia;
+  RAW_CHAIN_ID === base.id ? base : RAW_CHAIN_ID === baseSepolia.id ? baseSepolia : base;
 
 // Dev-time sanity warnings
 if (process.env.NODE_ENV !== 'production') {
@@ -35,21 +31,30 @@ if (process.env.NODE_ENV !== 'production') {
   }
   if (!process.env.NEXT_PUBLIC_RPC_URL) {
     // eslint-disable-next-line no-console
-    console.warn(
-      '[Web3] Using default RPC. Set NEXT_PUBLIC_RPC_URL to your Base RPC.',
-    );
+    console.warn('[Web3] Using default RPC. Set NEXT_PUBLIC_RPC_URL to your Base RPC.');
   }
 }
 
-// RainbowKit + wagmi config (handles connectors internally)
+// RainbowKit + wagmi config
 const config = getDefaultConfig({
   appName: 'Base Gold',
   projectId: WC_PROJECT_ID,
   chains: [TARGET_CHAIN],
+
+  // Helps when multiple injected wallets exist (Zerion, Coinbase, Brave, etc.)
+  multiInjectedProviderDiscovery: true,
+
   transports: {
-    [TARGET_CHAIN.id]: http(RPC_URL),
+    [TARGET_CHAIN.id]: http(RPC_URL, {
+      // optional: keep this lean; viem will retry some things internally
+      batch: true,
+    }),
   },
-  ssr: true,
+
+  // For wallet stability, client-only is typically best.
+  // If you absolutely need SSR, you can set this back to true,
+  // but it can create edge cases for connector hydration.
+  ssr: false,
 });
 
 const queryClient = new QueryClient();
