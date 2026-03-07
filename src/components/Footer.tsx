@@ -42,13 +42,7 @@ export default function Footer() {
             target="_blank"
             className="hover:text-amber-300 transition-colors"
           >
-            BaseScan
-          </Link>
-          <Link
-            href="https://x.com/BaseReserveGold"
-            target="_blank"
-            className="hover:text-amber-300 transition-colors"
-          >
+            
             X (Twitter)
           </Link>
           <Link

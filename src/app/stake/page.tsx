@@ -1,11 +1,12 @@
+import Link from 'next/link';
 import StakeClient from './StakeClient';
 import MetricsStrip from '@/components/MetricsStrip';
 import VaultStats from '@/components/VaultStats';
 
 export const metadata = {
-  title: 'Stake — Base Gold Reserve',
+  title: 'Vault Migration — Base Gold Reserve',
   description:
-    'Stake BGLD into the Base Gold Reserve vault to earn time-based rewards. Choose a lock and withdraw after the term.',
+    'V1 vault interactions are paused while Base Gold Reserve prepares the migration to V2 architecture.',
 };
 
 export default function StakePage() {
@@ -14,13 +15,13 @@ export default function StakePage() {
       {/* ===== Title & Intro ===== */}
       <section className="text-center mb-12">
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-3 text-amber-300">
-          Stake Your Gold. Strengthen the Reserve.
+          V1 Vaults Are Paused
         </h1>
 
         <p className="text-white/80 max-w-3xl mx-auto leading-relaxed">
-          Welcome to the <span className="text-amber-300 font-semibold">Base Gold Reserve Vault</span> — a
-          time-locked staking system designed to reward conviction and grow the Reserve on Base.
-          Your vault is transparent onchain and rewards vest over time.
+          The <span className="text-amber-300 font-semibold">Base Gold Reserve</span> is transitioning
+          from the original V1 vault system to a more sustainable V2 architecture.
+          Existing balances remain visible onchain while the migration path is finalized.
         </p>
 
         {/* Global market + vault stats */}
@@ -32,29 +33,29 @@ export default function StakePage() {
         </div>
 
         <p className="text-white/70 max-w-3xl mx-auto mt-4 leading-relaxed">
-          Use the module below to lock BGLD directly into the Reserve. Rewards are paid in{' '}
-          <span className="text-amber-300 font-semibold">BGLD</span>, vest continuously, and the
-          current APR is set by onchain parameters.
+          New V1 vault creation is temporarily disabled in the interface.
+          Users do not need to take action right now. Migration details and next steps will be shared
+          once the V2 path is finalized.
         </p>
 
-        {/* V2 upgrade notice (bullish, mellow) */}
+        {/* Pause notice */}
         <div className="mt-5 mx-auto max-w-3xl rounded-2xl border border-amber-300/30 bg-black/60 px-4 py-3 text-xs sm:text-sm text-amber-100">
           <div className="font-semibold text-amber-300 mb-0.5">
-            V2 Vaults are in active development
+            V1 interactions are temporarily paused
           </div>
           <p className="leading-relaxed">
-            V1 vaults remain live and honored onchain — and we’re building V2 to expand the system with longer-term
-            incentives and Base Gold Rush integration. If you prefer to be positioned for the full V2 feature set,
-            it may make sense to wait. If you choose to stake now, consider using a smaller test vault and a shorter lock.
+            V1 staking and withdrawals are currently unavailable in the interface while the protocol completes
+            a liquidity review and prepares the migration to <span className="text-amber-300 font-semibold">V2 Vaults</span>.
+            Existing balances remain recorded onchain.
           </p>
         </div>
       </section>
 
-      {/* ===== 3-Step How-To ===== */}
+      {/* ===== Migration Path ===== */}
       <section className="max-w-2xl mx-auto mb-10">
         <div className="rounded-2xl border border-white/12 bg-black/40 px-5 py-5">
           <h2 className="text-lg md:text-xl font-semibold text-amber-300 mb-3 text-center">
-            How to Stake in 3 Steps
+            What Happens Next
           </h2>
 
           <div className="space-y-3 text-sm md:text-base">
@@ -63,10 +64,10 @@ export default function StakePage() {
                 1
               </div>
               <div>
-                <div className="font-semibold text-white/90">Choose Your Lock</div>
+                <div className="font-semibold text-white/90">V1 Snapshot</div>
                 <p className="text-white/70">
-                  Enter your amount and choose a lock between <strong>1–30 days</strong>.
-                  The current APR is configured onchain and scales with duration.
+                  Existing V1 balances and positions remain visible onchain while the protocol finalizes
+                  the migration framework.
                 </p>
               </div>
             </div>
@@ -76,11 +77,10 @@ export default function StakePage() {
                 2
               </div>
               <div>
-                <div className="font-semibold text-white/90">Approve → Stake</div>
+                <div className="font-semibold text-white/90">V2 Architecture</div>
                 <p className="text-white/70">
-                  Tap <span className="text-amber-300 font-semibold">Approve</span>, then tap{' '}
-                  <span className="text-emerald-300 font-semibold">Stake</span>. Your position becomes a live vault
-                  tracked onchain.
+                  The next vault system is being designed around stronger long-term sustainability,
+                  updated reserve mechanics, and improved ecosystem alignment.
                 </p>
               </div>
             </div>
@@ -90,10 +90,10 @@ export default function StakePage() {
                 3
               </div>
               <div>
-                <div className="font-semibold text-white/90">Let Time Work</div>
+                <div className="font-semibold text-white/90">Migration Details</div>
                 <p className="text-white/70">
-                  Rewards vest across your lock term. At maturity you can withdraw principal plus vested rewards
-                  (minus protocol fees) or later roll into V2 once live.
+                  A dedicated migration path, updated mechanics, and future incentives will be announced
+                  before V2 goes live.
                 </p>
               </div>
             </div>
@@ -101,43 +101,65 @@ export default function StakePage() {
         </div>
       </section>
 
-      {/* ===== Staking Card (primary action) ===== */}
+      {/* ===== Disabled Staking Card ===== */}
       <section className="max-w-2xl mx-auto mb-12">
         <div className="rounded-2xl border border-amber-300/30 bg-black/50 backdrop-blur px-5 py-6 shadow-[0_0_24px_rgba(212,175,55,0.08)]">
-          <h2 className="text-2xl font-semibold mb-4 text-amber-300">Open a Vault</h2>
+          <h2 className="text-2xl font-semibold mb-4 text-amber-300">
+            V1 Vault Creation Paused
+          </h2>
           <p className="text-white/70 mb-6 leading-relaxed">
-            Choose how long to lock your BGLD — anywhere from <strong>1 to 30 days</strong>.
-            Rewards vest continuously while the vault is active. When the term ends, you can withdraw.
+            Opening new V1 vaults is temporarily disabled while the protocol prepares the migration to V2.
+            Existing balances remain recorded onchain, and no user action is required at this time.
           </p>
 
-          <StakeClient />
+          <div className="rounded-2xl border border-white/10 bg-black/40 p-5">
+            <div className="text-sm text-white/70 mb-4">
+              The staking module is currently unavailable.
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                disabled
+                className="w-full rounded-2xl bg-white/10 text-white/50 px-5 py-3 font-semibold cursor-not-allowed border border-white/10"
+              >
+                V1 Paused
+              </button>
+
+              <Link
+                href="/positions"
+                className="w-full rounded-2xl border border-amber-300/40 text-amber-200 hover:bg-amber-300/10 transition px-5 py-3 font-semibold text-center"
+              >
+                View Existing Vaults
+              </Link>
+            </div>
+          </div>
         </div>
 
-        {/* ===== Mechanics Summary Card ===== */}
+        {/* ===== Migration Summary Card ===== */}
         <div className="mt-6 rounded-2xl border border-white/12 bg-black/40 px-5 py-5">
           <h3 className="text-lg font-semibold text-amber-300 mb-2">
-            Vault Mechanics — Quick Summary
+            Migration Summary
           </h3>
           <ul className="list-disc pl-5 space-y-2 text-white/80 text-sm leading-relaxed">
             <li>
-              <span className="text-white/90 font-semibold">Rewards:</span> Paid in BGLD and vest continuously
-              over your selected lock.
+              <span className="text-white/90 font-semibold">V1 Status:</span> New staking and vault interaction
+              are temporarily paused in the interface.
             </li>
             <li>
-              <span className="text-white/90 font-semibold">APR:</span> Set by onchain parameters and scales with duration.
+              <span className="text-white/90 font-semibold">Balances:</span> Existing positions remain recorded
+              onchain and visible through the Vaults page.
             </li>
             <li>
-              <span className="text-white/90 font-semibold">Maturity Withdrawals:</span> A protocol fee may apply to principal + vested rewards.
+              <span className="text-white/90 font-semibold">V2 Goal:</span> Updated reserve mechanics, healthier
+              long-term sustainability, and future ecosystem incentives.
             </li>
             <li>
-              <span className="text-white/90 font-semibold">Early Exit:</span> A time-based penalty may apply; only vested rewards are paid out.
-            </li>
-            <li>
-              <span className="text-white/90 font-semibold">V2:</span> Longer locks + new incentives + Base Gold Rush integration are being prepared.
+              <span className="text-white/90 font-semibold">Next Steps:</span> Migration details, timelines, and
+              rollout information will be published as V2 is finalized.
             </li>
           </ul>
           <p className="text-[11px] text-white/45 mt-3 italic">
-            “Gold rewards conviction. The Reserve rewards time.”
+            “The Reserve is evolving. V2 is being built for the long term.”
           </p>
         </div>
       </section>

@@ -14,16 +14,16 @@ export default function VaultsPage() {
           Your BGLD Reserve Vaults
         </h1>
         <p className="mt-3 text-white/70 max-w-3xl mx-auto leading-relaxed text-sm sm:text-base">
-          Live staking positions read directly from the Base Gold contracts.
-          Withdraw at maturity or exit early if needed — always confirm final values in your wallet.
+          Existing V1 vault balances remain visible onchain while the protocol completes
+          the migration path to a more sustainable V2 architecture.
         </p>
 
         <div className="mt-5 flex flex-wrap justify-center gap-3">
           <Link
-            href="/stake"
+            href="/status"
             className="px-5 py-2.5 rounded-xl bg-amber-300 text-black font-semibold hover:bg-[#f1d371] transition"
           >
-            Open New Vault
+            Migration Status
           </Link>
           <Link
             href="/how-it-works"
@@ -32,44 +32,30 @@ export default function VaultsPage() {
             Mechanics / Whitepaper
           </Link>
           <Link
-            href="/status"
+            href="/"
             className="px-5 py-2.5 rounded-xl border border-amber-300/40 text-amber-200 hover:bg-amber-300/10 transition"
           >
-            Protocol Status
+            Back to Home
           </Link>
         </div>
       </header>
 
-      {/* ===== Legacy / V2 Announcement ===== */}
+      {/* ===== V1 Pause / V2 Migration Announcement ===== */}
       <section className="mb-8">
         <div className="rounded-2xl border border-amber-400/60 bg-gradient-to-r from-black via-[#2a2010] to-black px-4 sm:px-5 py-4 shadow-[0_0_20px_rgba(212,175,55,0.35)]">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-300 text-black text-xs font-extrabold shadow-[0_0_12px_rgba(212,175,55,0.8)]">
-                !
-              </span>
-              <div>
-                <div className="text-[11px] sm:text-xs font-semibold tracking-wide uppercase text-amber-200">
-                  Legacy Vaults (V1) • V2 Upgrade Coming
-                </div>
-                <p className="mt-1 text-[11px] sm:text-xs text-amber-100/90 leading-snug">
-                  V1 vaults remain active and continue vesting as normal. We’re preparing an upgraded
-                  V2 vault system with longer lock options and improved controls. You’ll be able to
-                  migrate or open new V2 positions when it goes live.
-                </p>
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-300 text-black text-xs font-extrabold shadow-[0_0_12px_rgba(212,175,55,0.8)]">
+              !
+            </span>
+            <div>
+              <div className="text-[11px] sm:text-xs font-semibold tracking-wide uppercase text-amber-200">
+                V1 Vaults Paused • V2 Migration In Progress
               </div>
-            </div>
-
-            <div className="flex flex-col items-stretch sm:items-end gap-2 text-[11px] sm:text-xs">
-              <Link
-                href="/stake"
-                className="inline-flex items-center justify-center rounded-xl border border-amber-300/70 bg-amber-300/10 px-3 py-1.5 text-amber-100 font-semibold hover:bg-amber-300/20 transition"
-              >
-                Open Stake
-              </Link>
-              <span className="text-[10px] text-amber-100/70 text-left sm:text-right">
-                Migration details will be announced before launch.
-              </span>
+              <p className="mt-1 text-[11px] sm:text-xs text-amber-100/90 leading-snug">
+                V1 interactions are temporarily paused in the interface while the protocol
+                completes a liquidity review and prepares the migration to V2 vault architecture.
+                Existing balances remain recorded onchain. No user action is required at this time.
+              </p>
             </div>
           </div>
         </div>
@@ -79,13 +65,13 @@ export default function VaultsPage() {
       <section className="mb-10">
         <div className="flex items-end justify-between gap-3 mb-3">
           <h2 className="text-xl font-semibold text-amber-200">
-            Your Active Positions (V1)
+            Your Existing Positions (V1)
           </h2>
           <Link
-            href="/stake"
+            href="/status"
             className="text-xs text-amber-200/80 hover:text-amber-200 underline underline-offset-4"
           >
-            + Open another vault
+            View migration updates
           </Link>
         </div>
 
@@ -102,32 +88,38 @@ export default function VaultsPage() {
                 <span className="text-[#0AA0FF] font-semibold">Base</span>
               </li>
               <li>• Give it a moment to sync (some wallets take a few seconds)</li>
-              <li>• If your wallet fails to estimate gas, try MetaMask/Coinbase Wallet</li>
+              <li>• Follow the Status page for migration timing and next steps</li>
             </ul>
           </div>
         </div>
       </section>
 
-      {/* ===== Mechanics (tight + no compound language) ===== */}
+      {/* ===== Migration Summary ===== */}
       <section className="rounded-2xl border border-amber-300/30 bg-black/50 px-6 py-6 mb-10 backdrop-blur shadow-[0_0_24px_rgba(212,175,55,0.08)]">
         <h2 className="text-lg font-semibold text-amber-300 mb-3">
-          Withdraw & Exit Rules (V1)
+          V1 Pause & Migration Summary
         </h2>
         <ul className="space-y-2 text-white/80 text-sm leading-relaxed">
           <li>
-            • <span className="text-emerald-300 font-semibold">Withdraw at Maturity</span> — available when the lock
-            completes. A <span className="text-amber-300 font-semibold">2%</span> fee applies on principal + vested
-            rewards.
+            • <span className="text-white/90 font-semibold">V1 Status:</span> New staking,
+            withdrawals, and emergency exits are temporarily disabled in the interface.
           </li>
           <li>
-            • <span className="text-rose-400 font-semibold">Emergency Exit</span> — exit early with a penalty that
-            decays from <span className="text-amber-300 font-semibold">10%</span> down to{' '}
-            <span className="text-amber-300 font-semibold">1%</span> as maturity approaches.
+            • <span className="text-white/90 font-semibold">Balances:</span> Existing positions remain
+            visible onchain and can still be reviewed on this page.
+          </li>
+          <li>
+            • <span className="text-white/90 font-semibold">V2 Goal:</span> Updated reserve mechanics,
+            improved sustainability, and future ecosystem incentives.
+          </li>
+          <li>
+            • <span className="text-white/90 font-semibold">Next Steps:</span> Migration details,
+            timelines, and rollout updates will be published through the Status page.
           </li>
         </ul>
         <p className="mt-4 text-xs text-white/55">
-          All balances and rewards are fetched directly from your wallet and the Base Gold smart contracts.
-          Always verify the final amounts shown in your wallet before confirming.
+          This page remains available so users can review existing vault balances while the protocol
+          finalizes the transition path to V2.
         </p>
       </section>
 
@@ -145,16 +137,16 @@ export default function VaultsPage() {
       <section className="text-center">
         <div className="inline-flex flex-wrap justify-center gap-3">
           <Link
-            href="/stake"
+            href="/status"
             className="px-5 py-2.5 rounded-xl bg-amber-300 text-black font-semibold hover:bg-[#f1d371] transition"
           >
-            Open New Vault
+            Migration Status
           </Link>
           <Link
-            href="/status"
+            href="/"
             className="px-5 py-2.5 rounded-xl border border-amber-300/40 text-amber-200 hover:bg-amber-300/10 transition"
           >
-            Protocol Status
+            Return Home
           </Link>
         </div>
       </section>

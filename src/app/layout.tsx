@@ -9,10 +9,10 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Web3Provider } from '@/providers/Web3Provider';
 
-
 export const metadata: Metadata = {
-  title: 'Base Gold – Stake Your Claim',
-  description: 'Stake BGLD on Base. Simple locks, high APR, compounding.',
+  title: 'Base Gold Reserve',
+  description:
+    'Base Gold Reserve is transitioning from legacy V1 vaults to a more sustainable V2 architecture. Existing balances remain visible onchain while migration details are finalized.',
   applicationName: 'Base Gold',
   manifest: '/manifest.webmanifest',
   icons: {
@@ -25,16 +25,18 @@ export const metadata: Metadata = {
     shortcut: ['/favicon.ico'],
   },
   openGraph: {
-    title: 'Base Gold – Stake Your Claim',
-    description: 'Stake BGLD on Base. Simple locks, high APR, compounding.',
+    title: 'Base Gold Reserve',
+    description:
+      'Base Gold Reserve is transitioning from legacy V1 vaults to a more sustainable V2 architecture. Existing balances remain visible onchain while migration details are finalized.',
     url: 'https://stake.basereserve.gold',
     siteName: 'Base Gold',
-    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Base Gold' }],
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Base Gold Reserve' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Base Gold – Stake Your Claim',
-    description: 'Stake BGLD on Base. Simple locks, high APR, compounding.',
+    title: 'Base Gold Reserve',
+    description:
+      'Base Gold Reserve is transitioning from legacy V1 vaults to a more sustainable V2 architecture.',
     images: ['/og-image.png'],
   },
 };
@@ -53,7 +55,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="min-h-screen flex flex-col bg-black text-white selection:bg-amber-400/25 selection:text-amber-200">
         <Web3Provider>
-           <EnvProbe />
+          <EnvProbe />
           <div
             aria-hidden="true"
             className="pointer-events-none fixed inset-x-0 top-0 z-0 h-24 opacity-20 blur-3xl"
@@ -63,24 +65,19 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             }}
           />
 
-          {/* ===== GLOBAL V2 ANNOUNCEMENT BANNER ===== */}
-<div className="w-full bg-gradient-to-r from-amber-300/10 via-amber-300/20 to-amber-300/10 border-b border-amber-300/30 backdrop-blur-md py-3 px-4 text-center">
-  <p className="text-[13px] md:text-sm text-amber-200 leading-snug font-medium">
-    <span className="font-bold text-amber-300">BASE GOLD RESERVE UPDATE:</span>
-    &nbsp;Vault parameters have been refined to strengthen long-term sustainability as we prepare
-    the next evolution of the Base Gold Reserve.
-    <br className="hidden sm:block" />
-    <span className="text-amber-300 font-semibold">V2 Vaults</span> will introduce longer lock options,
-    enhanced reward structures, and integrated casino incentives —
-    designed to reward long-term conviction.
-    <br className="hidden sm:block" />
-    <span className="text-white/80">
-      Staking remains live. Existing vaults continue normally.
-      More details on V2 will be announced ahead of launch.
-    </span>
-  </p>
-</div>
-
+          {/* ===== GLOBAL V1 PAUSE / V2 MIGRATION BANNER ===== */}
+          <div className="w-full bg-gradient-to-r from-red-500/15 via-amber-300/15 to-red-500/15 border-b border-amber-300/30 backdrop-blur-md py-3 px-4 text-center">
+            <p className="text-[13px] md:text-sm text-amber-100 leading-snug font-medium">
+              <span className="font-bold text-amber-300">BASE GOLD RESERVE UPDATE:</span>
+              &nbsp;V1 vault interactions are temporarily paused while we complete a liquidity review and prepare
+              the migration to <span className="text-amber-300 font-semibold">V2 Vaults</span>.
+              <br className="hidden sm:block" />
+              <span className="text-white/85">
+                Existing V1 balances remain recorded onchain. No user action is required at this time.
+                Migration details and next steps will be announced shortly.
+              </span>
+            </p>
+          </div>
 
           <Header />
           <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-24 pt-4 relative z-10">

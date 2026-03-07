@@ -1,11 +1,12 @@
+import Link from 'next/link';
+
 export default function HowItWorksPage() {
   return (
     <main className="min-h-[60vh] px-6 py-10 max-w-4xl mx-auto text-white">
-      <h1 className="text-3xl font-semibold mb-6">Base Gold Vault Mechanics</h1>
+      <h1 className="text-3xl font-semibold mb-6">Base Gold Reserve Mechanics</h1>
 
-      {/* ===== Whitepaper Banner ===== */}
+      {/* ===== Migration Banner ===== */}
       <section className="relative overflow-hidden rounded-2xl border border-amber-300/30 bg-gradient-to-b from-black/70 via-[#0b0b0b]/85 to-black/90 px-6 py-10 shadow-[0_0_48px_rgba(212,175,55,0.10)]">
-        {/* watermark seal */}
         <div className="pointer-events-none absolute inset-0 opacity-[0.06] [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]">
           <div className="absolute -right-16 -top-16 w-80 h-80 rounded-full border border-amber-300/40 blur-[1px]" />
           <div className="absolute -right-10 -top-10 w-72 h-72 rounded-full border border-amber-300/25" />
@@ -15,152 +16,155 @@ export default function HowItWorksPage() {
           <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-black/40 px-4 py-1 text-xs text-amber-200/90">
             <span>Base Gold Reserve Protocol</span>
             <span className="opacity-60">•</span>
-            <span>Whitepaper v1.0 (V1 Vaults)</span>
+            <span>V1 Transition / V2 Preparation</span>
           </div>
 
           <h1 className="mt-4 text-4xl md:text-5xl font-extrabold tracking-tight text-amber-300">
-            THE GOLD STANDARD MECHANISM
+            V1 VAULTS ARE TRANSITIONING TO V2
           </h1>
           <p className="mt-3 text-white/70 max-w-3xl mx-auto">
-            A Base-native Reserve that channels conviction into time-locked vaults.
-            Transparent math, fixed-duration staking, and liquidity that grows with the vault.
+            The original Base Gold Reserve vault system is being transitioned into a dedicated
+            migration path while the protocol prepares a more sustainable V2 architecture.
+            Existing balances remain recorded onchain.
           </p>
 
           <div className="mt-6 flex items-center justify-center gap-4">
-            <a
-              href="/stake"
+            <Link
+              href="/positions"
               className="px-5 py-2.5 rounded-xl bg-amber-300 text-black font-semibold hover:bg-[#f1d371] transition"
             >
-              Open a V1 Vault
-            </a>
-            <a
-              href="#whitepaper"
+              View Existing Vaults
+            </Link>
+            <Link
+              href="/status"
               className="px-5 py-2.5 rounded-xl border border-amber-300/40 text-amber-200 hover:bg-amber-300/10 transition"
             >
-              Read Whitepaper
-            </a>
+              Migration Status
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* anchor */}
+      <section className="mt-8 rounded-2xl border border-amber-300/30 bg-black/50 px-6 py-6 shadow-[0_0_24px_rgba(212,175,55,0.08)]">
+  <h2 className="text-2xl font-semibold text-amber-300 mb-3">
+    For Existing V1 Vault Holders
+  </h2>
+  <p className="text-white/80 leading-relaxed">
+    If you already opened a V1 vault, your position has not disappeared and has not been removed from the protocol.
+    Existing balances remain recorded onchain and visible through the Vaults page while the migration path to V2 is finalized.
+  </p>
+  <p className="mt-3 text-white/75 leading-relaxed">
+    The current pause is intended to move the legacy V1 system into a structured migration process.
+    No action is required from users at this time. Additional details, next steps, and migration guidance will be published through the Status page as they are finalized.
+  </p>
+  
+  <div className="mt-4 flex flex-wrap gap-3">
+    <Link
+      href="/positions"
+      className="px-4 py-2 rounded-xl bg-amber-300 text-black font-semibold hover:bg-[#f1d371] transition"
+    >
+      View Existing Vaults
+    </Link>
+    <Link
+      href="/status"
+      className="px-4 py-2 rounded-xl border border-amber-300/40 text-amber-200 hover:bg-amber-300/10 transition"
+    >
+      Migration Status
+    </Link>
+  </div>
+</section>
+
       <div id="whitepaper" className="mt-12" />
 
       <section className="space-y-4 text-white/80 leading-relaxed">
         <p>
-          Base Gold lets you lock BGLD into time-bound vaults (currently 1–30 days in V1)
-          and earn rewards that vest continuously across the term. The APR range is
-          configured on-chain and published transparently. Longer locks target higher APR
-          within bounds.
+          Base Gold originally introduced V1 as a time-locked vault system where BGLD could be
+          deposited into fixed-duration positions. Those balances remain visible onchain, but V1
+          interactions are currently paused in the interface while the protocol finalizes its next phase.
         </p>
         <p>
-          While your vault is active, rewards accrue in BGLD and can be monitored on the
-          Vaults page. At the end of your chosen term, you may withdraw your principal plus
-          vested rewards (minus protocol fees) or later decide to open a new vault,
-          including on V2 once deployed.
+          The current focus is not new V1 participation, but a transition into a more durable V2
+          reserve design. Existing positions continue to be part of the historical onchain state and
+          remain reviewable through the Vaults page.
         </p>
         <p>
-          Exiting early is allowed, but a principal penalty applies that decays as your
-          vault approaches maturity, and only the vested portion of rewards is paid. This
-          design discourages short-term churn and helps maintain vault health.
+  For users with existing V1 positions, the protocol is treating those vaults as part of a migration workflow rather than as abandoned balances.
+  The interface pause is designed to stabilize the transition to V2 while keeping legacy positions visible and reviewable onchain.
+</p>
+        <p>
+          V2 is intended to preserve the core reserve concept while improving long-term sustainability,
+          refining reward mechanics, and aligning more closely with the broader Base Gold ecosystem.
         </p>
         <p>
-          A small fee on withdraw is routed back to the protocol to strengthen reserves and
-          support long-term sustainability. V2 will preserve these core ideas while
-          simplifying mechanics and introducing dynamic APR linked to vault conditions.
+          During this transition period, users should treat V1 as a legacy system under migration rather
+          than an actively promoted staking product.
         </p>
       </section>
 
-      {/* ===== Base Gold Whitepaper ===== */}
+      {/* ===== Protocol Overview ===== */}
       <section className="mt-16 rounded-2xl border border-amber-300/30 bg-black/50 px-6 py-8 shadow-[0_0_24px_rgba(212,175,55,0.08)]">
         <h2 className="text-3xl font-bold mb-4 text-amber-300">
-          Base Gold Reserve Whitepaper (V1 Overview)
+          Base Gold Reserve Overview
         </h2>
         <p className="text-white/80 mb-6 leading-relaxed">
-          The <strong>Base Gold Reserve</strong> is an onchain staking ecosystem designed
-          for long-term stability, high-yield rewards, and Base-native liquidity. It
-          merges the perceived reliability of &quot;digital gold&quot; with the speed and
-          transparency of blockchain technology.
+          The <strong>Base Gold Reserve</strong> is an onchain reserve ecosystem built around the idea
+          of time preference, transparent contract state, and long-term alignment. The protocol is now
+          moving from its initial V1 vault model toward a more sustainable V2 architecture.
         </p>
 
         <h3 className="text-xl font-semibold mb-3 text-white/90">1. Reserve Vision</h3>
         <p className="text-white/70 mb-5 leading-relaxed">
-          Base Gold exists as a digital hedge for volatile markets. When others chase hype,
-          BGLD focuses on time and conviction. Every lock and every completed term adds
-          structural strength to the vault, forming an expanding onchain reserve governed
-          by mathematics, not centralized discretion.
+          Base Gold is built around a reserve-first philosophy. The goal is to create a durable Base-native
+          system where long-term alignment matters more than short-term churn, and where onchain visibility
+          remains central to how the reserve is understood.
         </p>
 
-        <h3 className="text-xl font-semibold mb-3 text-white/90">2. Tokenomics</h3>
-        <ul className="list-disc pl-6 mb-5 space-y-2 text-white/80">
-          <li>Total Supply: <strong>1,000,000,000 BGLD</strong></li>
-          <li>
-            A portion of supply is seeded by the team to initialize staking vaults and
-            protocol-owned liquidity (POL) on Base.
-          </li>
-          <li>Protocol fees recycle back into vault reserves.</li>
-          <li>Rewards are distributed in BGLD and vest continuously across each lock.</li>
-          <li>Liquidity is reinforced through team-held POL on Base DEXs.</li>
-        </ul>
+        <h3 className="text-xl font-semibold mb-3 text-white/90">2. Legacy V1 Vaults</h3>
+        <p className="text-white/70 mb-5 leading-relaxed">
+          V1 introduced short-term time-locked vault mechanics and onchain reward accounting. Those positions
+          remain part of the protocol’s onchain history, but V1 is now being treated as a legacy generation
+          of the reserve while migration planning moves forward.
+        </p>
 
-        <h3 className="text-xl font-semibold mb-3 text-white/90">3. Reward Mechanics (V1)</h3>
+        <h3 className="text-xl font-semibold mb-3 text-white/90">3. V2 Direction</h3>
         <ul className="list-disc pl-6 mb-5 space-y-2 text-white/80">
-          <li>APR scales with lock duration and is published onchain.</li>
-          <li>Rewards accrue in BGLD and vest linearly over the chosen term.</li>
-          <li>
-            Withdrawals at maturity incur a small protocol fee on principal plus vested
-            rewards.
-          </li>
-          <li>
-            Early exit applies a time-based penalty to principal and pays only vested
-            rewards.
-          </li>
+          <li>Updated reserve mechanics designed for stronger long-term sustainability.</li>
+          <li>Improved alignment between vault structure and broader ecosystem health.</li>
+          <li>Future utility tied more directly to the wider Base Gold roadmap.</li>
+          <li>Migration planning that preserves visibility into legacy V1 balances.</li>
         </ul>
 
         <h3 className="text-xl font-semibold mb-3 text-white/90">
-          4. Liquidity & Sustainability
+          4. Onchain Transparency
         </h3>
         <p className="text-white/70 mb-5 leading-relaxed">
-          Team-seeded POL helps Base Gold maintain liquidity depth onchain, shielding the
-          system from shallow markets and supporting consistent reward flows. Fees
-          continuously reinforce this reserve, aiming for sustainable yields instead of
-          unsustainable inflation. V2 builds on this foundation with a cleaner curve and
-          TVL-aware APR.
+          A core principle of Base Gold remains transparency. Even during migration, existing balances,
+          vault identifiers, and contract references remain visible onchain and reviewable through the
+          protocol interface.
         </p>
 
         <h3 className="text-xl font-semibold mb-3 text-white/90">
-          5. The Philosophy of Gold
+          5. Transition Philosophy
         </h3>
         <p className="text-white/70 leading-relaxed">
-          Gold represents trust, permanence, and value through time. Base Gold mirrors that
-          principle for the digital age — not through a hard peg, but through transparency,
-          time preference, and collective conviction. Each staker becomes a contributor to
-          a decentralized Reserve where rewards flow to those willing to lock through
-          volatility.
+          The current transition is focused on evolving the reserve architecture rather than abandoning it.
+          V2 is intended to carry forward the reserve concept with healthier long-term mechanics and stronger
+          system design.
         </p>
 
         <div className="mt-6 text-center text-sm text-white/60 italic">
-          “When the noise fades, the Reserve remains.”
+          “The reserve evolves. Transparency remains.”
         </div>
       </section>
 
       <div className="rounded-2xl border border-white/10 bg-black/40 p-5 mt-8">
-        <h2 className="text-xl font-semibold text-amber-300 mb-2">Key Properties</h2>
+        <h2 className="text-xl font-semibold text-amber-300 mb-2">Current Key Properties</h2>
         <ul className="list-disc pl-6 space-y-2 text-white/80">
-          <li>Rewards vest continuously over the selected term.</li>
-          <li>APR increases with longer lock durations, within posted bounds.</li>
-          <li>
-            Early exit pays vested rewards only and applies a time-decaying principal
-            penalty.
-          </li>
-          <li>
-            Protocol fees on withdrawals and other actions feed back into the vault and
-            POL.
-          </li>
-          <li>
-            V2 will keep the &quot;time-locked reserve&quot; idea while simplifying
-            behavior for long-term stability.
-          </li>
+          <li>V1 vault balances remain visible onchain.</li>
+          <li>V1 interactions are temporarily paused in the interface.</li>
+          <li>Migration details and rollout updates will be published through the Status page.</li>
+          <li>V2 is being built as the next long-term reserve architecture.</li>
+          <li>The reserve-first concept remains central to the protocol direction.</li>
         </ul>
       </div>
     </main>

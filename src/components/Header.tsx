@@ -39,19 +39,17 @@ export default function Header() {
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-6 text-sm">
           <NavLink href="/">Home</NavLink>
-          <NavLink href="/stake">Stake Claim</NavLink>
+          <NavLink href="/stake">V2 Migration</NavLink>
           <NavLink href="/positions">Vaults</NavLink>
           <NavLink href="/status">Status</NavLink>
           <NavLink href="/how-it-works">Mechanics</NavLink>
           <NavLink href="/terms">Terms</NavLink>
         </nav>
 
-        {/* Right cluster: WalletChip + Connect + Hamburger */}
+        {/* Right cluster */}
         <div className="ml-auto flex items-center gap-3">
-          {/* Always visible Wallet chip */}
           <WalletChip />
 
-          {/* Always visible Connect (moved out of drawer; on all breakpoints) */}
           <div className="shrink-0">
             <ConnectButton
               chainStatus="icon"
@@ -60,7 +58,6 @@ export default function Header() {
             />
           </div>
 
-          {/* Mobile menu button (opens links only) */}
           <button
             aria-label="Open menu"
             onClick={() => setOpen(true)}
@@ -73,14 +70,13 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Mobile Drawer (links only — NO Connect here) */}
+      {/* Mobile Drawer */}
       <div
         className={`fixed inset-y-0 right-0 z-[60] w-72 transform transition-transform duration-300 md:hidden border-l border-white/10 shadow-2xl
         ${open ? 'translate-x-0' : 'translate-x-full'}
         bg-black/95`}
         style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
       >
-        {/* Drawer header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 text-white">
           <div className="flex items-center gap-3">
             <span className="relative block h-10 w-10">
@@ -105,11 +101,10 @@ export default function Header() {
           </button>
         </div>
 
-        {/* Drawer links (no Connect here) */}
         <nav className="flex flex-col px-4 py-3 text-white/90">
           {[
             ['/', 'Home'],
-            ['/stake', 'Stake'],
+            ['/stake', 'V2 Migration'],
             ['/positions', 'Vaults'],
             ['/status', 'Status'],
             ['/how-it-works', 'Mechanics'],
@@ -127,7 +122,6 @@ export default function Header() {
         </nav>
       </div>
 
-      {/* Dark backdrop under drawer */}
       {open && <div className="fixed inset-0 z-[50] bg-black/60 md:hidden" onClick={() => setOpen(false)} />}
     </header>
   );

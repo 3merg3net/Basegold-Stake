@@ -1,12 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import {
-  useAccount,
-  useReadContracts,
-  useWriteContract,
-  usePublicClient,
-} from 'wagmi';
+import { useMemo } from 'react';
+import { useAccount, useReadContracts } from 'wagmi';
 import { formatUnits } from 'viem';
 import { useBgldPrice } from '@/hooks/useBgldPrice';
 
@@ -19,7 +14,6 @@ const env = {
 
 /* ───────── Minimal staking ABI ───────── */
 const STAKING_ABI: any = [
-  // views
   {
     type: 'function',
     name: 'positionsOf',
@@ -58,22 +52,6 @@ const STAKING_ABI: any = [
     stateMutability: 'view',
     inputs: [{ name: 'id', type: 'uint256' }],
     outputs: [{ type: 'uint32' }],
-  },
-
-  // actions
-  {
-    type: 'function',
-    name: 'withdraw',
-    stateMutability: 'nonpayable',
-    inputs: [{ name: 'id', type: 'uint256' }],
-    outputs: [],
-  },
-  {
-    type: 'function',
-    name: 'emergencyExit',
-    stateMutability: 'nonpayable',
-    inputs: [{ name: 'id', type: 'uint256' }],
-    outputs: [],
   },
 ];
 
@@ -129,42 +107,12 @@ function secsToDHMS(secsNum: number) {
   return d > 0 ? `${d}d ${h}h` : `${h}h ${m}m`;
 }
 
-function friendlyTxError(e: any): string {
-  // viem/wagmi often provide shortMessage
-  const msg =
-    e?.shortMessage ||
-    e?.message ||
-    (typeof e === 'string' ? e : 'Transaction failed');
-
-  // Common cases you’ll see:
-  // - User rejected request
-  if (/user rejected|denied|rejected/i.test(msg)) return 'Transaction cancelled.';
-
-  // - Not matured / revert
-  if (/revert|execution reverted/i.test(msg)) {
-    return 'Transaction reverted. If the vault is not fully matured, try Emergency Exit or wait until maturity.';
-  }
-
-  // - the specific issue
-  if (/intrinsic gas too low|gas 0/i.test(msg)) {
-    return 'Your wallet failed to estimate gas and tried to submit with gas=0. Please try again, or use another wallet (MetaMask/Coinbase).';
-  }
-
-  return msg;
-}
-
 /* ───────── Component ───────── */
 export default function VaultsPanel({ className }: { className?: string }) {
-  const { address, chain } = useAccount();
+  const { address } = useAccount();
   const enabled = Boolean(address && env.STAKING);
 
   const priceUsd = useBgldPrice();
-  const publicClient = usePublicClient({ chainId: env.CHAIN_ID });
-
-  const [pendingId, setPendingId] = useState<bigint | null>(null);
-  const [pendingFn, setPendingFn] = useState<'withdraw' | 'emergencyExit' | null>(
-    null,
-  );
 
   const toUsd = (bgld: bigint, decimals = 18) => {
     if (!priceUsd) return undefined;
@@ -175,7 +123,6 @@ export default function VaultsPanel({ className }: { className?: string }) {
   // 1) IDs
   const {
     data: idsData,
-    refetch: refetchIds,
     isLoading: idsLoading,
     isFetching: idsFetching,
   } = useReadContracts({
@@ -228,7 +175,6 @@ export default function VaultsPanel({ className }: { className?: string }) {
 
   const {
     data: posReads,
-    refetch: refetchPos,
     isLoading: posLoading,
     isFetching: posFetching,
   } = useReadContracts({
@@ -241,7 +187,6 @@ export default function VaultsPanel({ className }: { className?: string }) {
     },
   });
 
-  // Rows
   type Row = {
     id: bigint;
     amount: bigint;
@@ -292,13 +237,11 @@ export default function VaultsPanel({ className }: { className?: string }) {
     return out.sort((a, b) => Number(b.id - a.id));
   }, [posReads, idList]);
 
-  // hide closed/empty
   const visibleRows = useMemo(
     () => rows.filter((r) => !r.closed && r.amount > 0n),
     [rows],
   );
 
-  // Totals for header
   const totals = useMemo(() => {
     if (!visibleRows.length) {
       return {
@@ -339,68 +282,9 @@ export default function VaultsPanel({ className }: { className?: string }) {
     };
   }, [visibleRows, priceUsd]);
 
-  const { writeContractAsync } = useWriteContract();
-
-  async function doAction(fn: 'withdraw' | 'emergencyExit', id: bigint) {
-    if (!address) throw new Error('Wallet not connected');
-    if (!env.STAKING) throw new Error('Missing staking contract address');
-    if (!publicClient) throw new Error('Public client not ready');
-
-    // Optional safety: if user connected wrong chain, give a friendlier error
-    if (chain?.id && chain.id !== env.CHAIN_ID) {
-      throw new Error(
-        `Wrong network selected. Please switch to chainId ${env.CHAIN_ID} and try again.`,
-      );
-    }
-
-    setPendingId(id);
-    setPendingFn(fn);
-
-    try {
-      // ✅ Force gas estimation in-app (fixes Zerion/WC “gas 0”)
-      const estimatedGas = await publicClient.estimateContractGas({
-        abi: STAKING_ABI,
-        address: env.STAKING as `0x${string}`,
-        functionName: fn,
-        args: [id],
-        account: address as `0x${string}`,
-      });
-
-      // Add buffer
-      const gas = (estimatedGas * 120n) / 100n;
-
-      const tx = await writeContractAsync({
-        abi: STAKING_ABI,
-        address: env.STAKING as `0x${string}`,
-        functionName: fn,
-        args: [id],
-        chainId: env.CHAIN_ID,
-        gas,
-      });
-
-      // refresh reads after wallet broadcast
-      setTimeout(() => {
-        refetchPos();
-        refetchIds();
-      }, 1500);
-
-      return tx;
-    } catch (e: any) {
-      // surface helpful message to user
-      const msg = friendlyTxError(e);
-      // eslint-disable-next-line no-alert
-      alert(msg);
-      throw e;
-    } finally {
-      setPendingId(null);
-      setPendingFn(null);
-    }
-  }
-
   const loading =
     enabled && (idsLoading || idsFetching || posLoading || posFetching);
 
-  /* ───────── Empty / loading states ───────── */
   if (!enabled) {
     return (
       <div className={className}>
@@ -435,15 +319,13 @@ export default function VaultsPanel({ className }: { className?: string }) {
     return (
       <div className={className}>
         <div className="rounded-2xl border border-white/12 bg-black/50 p-5 text-white/70 text-sm">
-          No active vaults found for this wallet. Existing V1 stakes will remain
-          visible here until they are withdrawn or exited as we prepare the
-          migration to the new V2 vault.
+          No active vaults found for this wallet. Existing V1 balances will remain
+          visible here while the migration path to V2 is finalized.
         </div>
       </div>
     );
   }
 
-  /* ───────── Cards ───────── */
   return (
     <div className={className}>
       {/* My Vault Totals header */}
@@ -489,6 +371,17 @@ export default function VaultsPanel({ className }: { className?: string }) {
         </div>
       </div>
 
+      {/* V1 pause notice */}
+      <div className="mb-5 rounded-2xl border border-amber-300/25 bg-amber-300/5 px-4 py-4">
+        <div className="text-sm font-semibold text-amber-200">
+          V1 interactions are paused
+        </div>
+        <p className="mt-1 text-xs sm:text-sm text-white/70 leading-relaxed">
+          Withdrawals, emergency exits, and new V1 actions are temporarily disabled in the interface
+          while the protocol finalizes the migration path to V2. Existing balances remain visible onchain.
+        </p>
+      </div>
+
       {/* Vault cards */}
       <div className="space-y-5">
         {visibleRows.map((r) => {
@@ -502,8 +395,6 @@ export default function VaultsPanel({ className }: { className?: string }) {
           const elapsed = Math.max(0, termSecNum - remainingSec);
           const progress =
             termSecNum > 0 ? Math.min(100, Math.floor((elapsed / termSecNum) * 100)) : 0;
-
-          const isPending = pendingId === r.id;
 
           return (
             <div
@@ -571,41 +462,30 @@ export default function VaultsPanel({ className }: { className?: string }) {
                 <Metric label="Remaining" value={secsToDHMS(remainingSec)} />
                 <Metric label="Status" value={r.closed ? 'Closed' : 'Active'} />
 
-                {/* Inline disclaimer */}
                 <div className="col-span-2 sm:col-span-2 rounded-xl border border-white/10 bg-black/40 p-3">
                   <p className="text-[11px] leading-relaxed text-white/55">
-                    <span className="text-white/70 font-semibold">Reminder:</span>{' '}
-                    Early exit applies a decaying penalty from
-                    <span className="text-amber-200"> 10%</span> down to{' '}
-                    <span className="text-amber-200">1%</span> as maturity approaches.
-                    Withdrawals at maturity incur a{' '}
-                    <span className="text-amber-200">2%</span> fee on principal + vested
-                    rewards. Always verify final values in your wallet before confirming a
-                    transaction.
+                    <span className="text-white/70 font-semibold">Migration note:</span>{' '}
+                    This V1 position remains visible onchain while the protocol finalizes the transition
+                    to V2. Interface actions are temporarily paused. Follow the Status page for migration
+                    timing and next steps.
                   </p>
                 </div>
               </div>
 
-              {/* Actions */}
+              {/* Disabled actions */}
               {!r.closed && (
                 <div className="mt-4 grid grid-cols-2 sm:grid-cols-2 gap-2">
                   <button
-                    disabled={isPending}
-                    onClick={() => doAction('withdraw', r.id)}
-                    className={`rounded-xl px-3 py-2 border border-emerald-400 text-emerald-200 bg-black/40 hover:bg-emerald-400/10 ${
-                      isPending ? 'opacity-60 cursor-not-allowed' : ''
-                    }`}
+                    disabled
+                    className="rounded-xl px-3 py-2 border border-white/10 text-white/45 bg-black/30 cursor-not-allowed"
                   >
-                    {isPending && pendingFn === 'withdraw' ? 'Withdrawing…' : 'Withdraw at Maturity'}
+                    Withdraw Paused
                   </button>
                   <button
-                    disabled={isPending}
-                    onClick={() => doAction('emergencyExit', r.id)}
-                    className={`rounded-xl px-3 py-2 border border-red-400 text-red-200 bg-black/40 hover:bg-red-400/10 ${
-                      isPending ? 'opacity-60 cursor-not-allowed' : ''
-                    }`}
+                    disabled
+                    className="rounded-xl px-3 py-2 border border-white/10 text-white/45 bg-black/30 cursor-not-allowed"
                   >
-                    {isPending && pendingFn === 'emergencyExit' ? 'Exiting…' : 'Emergency Exit'}
+                    Exit Paused
                   </button>
                 </div>
               )}

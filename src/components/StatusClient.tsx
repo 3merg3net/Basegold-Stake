@@ -1,13 +1,11 @@
-// src/components/StatusClient.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
-import GoldCalculator from '@/components/GoldCalculator';
 import Link from 'next/link';
 import MetricsStrip from '@/components/MetricsStrip';
 import VaultStats from '@/components/VaultStats';
 
-const SUPPLY = Number(process.env.NEXT_PUBLIC_BGLD_SUPPLY || '1000000000'); // for MC calc
+const SUPPLY = Number(process.env.NEXT_PUBLIC_BGLD_SUPPLY || '1000000000');
 const BGLD_CA =
   process.env.NEXT_PUBLIC_BGLD_CA ||
   process.env.NEXT_PUBLIC_BGLD_ADDRESS ||
@@ -23,43 +21,96 @@ export default function StatusClient() {
           Base Gold — Protocol Status
         </h1>
         <p className="mt-3 text-white/75 max-w-3xl mx-auto leading-relaxed">
-          Live health of the <span className="text-amber-300 font-semibold">Reserve Vault</span> on Base.
-          Main Base Gold Vault Contract Status
+          Current protocol status, live market references, and migration updates for the
+          <span className="text-amber-300 font-semibold"> Base Gold Reserve</span>.
         </p>
       </header>
-      <MetricsStrip/>
-      <VaultStats/>
 
-      {/* ===== New Status Grid (replaces MetricsStrip) ===== */}
+      {/* ===== Migration status banner ===== */}
+      <section className="mb-8">
+        <div className="rounded-2xl border border-amber-300/30 bg-black/60 px-5 py-5 shadow-[0_0_24px_rgba(212,175,55,0.08)]">
+          <div className="text-xs uppercase tracking-wider text-amber-200 font-semibold">
+            Current Protocol Notice
+          </div>
+          <h2 className="mt-1 text-xl md:text-2xl font-semibold text-amber-300">
+            V1 Vault Interactions Are Temporarily Paused
+          </h2>
+          <p className="mt-3 text-sm md:text-base text-white/75 leading-relaxed">
+            The Base Gold Reserve is transitioning from the original V1 vault system to a more
+            sustainable V2 architecture. Existing V1 balances remain recorded onchain while the
+            protocol completes its migration planning and publishes the next steps.
+          </p>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <NoticePill
+              title="V1 Status"
+              value="Paused in UI"
+              tone="amber"
+            />
+            <NoticePill
+              title="Balances"
+              value="Visible Onchain"
+              tone="blue"
+            />
+            <NoticePill
+              title="Next Phase"
+              value="V2 Migration"
+              tone="emerald"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ===== Live refs ===== */}
+      <section className="mb-8">
+        <div className="mb-3 text-xs sm:text-sm text-white/60 text-center">
+          Live market references and visible vault data from Base Gold contracts.
+        </div>
+        <MetricsStrip />
+        <div className="mt-6">
+          <VaultStats />
+        </div>
+      </section>
+
+      {/* ===== Status Grid ===== */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-amber-300 mb-2 text-center">Protocol Health Snapshot</h2>
+        <h2 className="text-xl font-semibold text-amber-300 mb-2 text-center">
+          Protocol Health Snapshot
+        </h2>
         <p className="text-white/60 text-center mb-4 text-sm">
-          BGLD Staking Vault Stats
+          Current market references and general protocol indicators
         </p>
         <StatusStats />
       </section>
 
-      
-
-      {/* ===== Protocol Settings (static, no extra APIs) ===== */}
+      {/* ===== Migration / protocol cards ===== */}
       <section className="grid gap-6 md:grid-cols-2 mb-12">
-        <ProtocolSettingsCard />
+        <MigrationStatusCard />
         <AddressesCard bgld={BGLD_CA} staking={STAKING_CA} />
       </section>
 
-      {/* ===== Closing Confidence Block ===== */}
+      {/* ===== Static protocol references ===== */}
+      <section className="grid gap-6 md:grid-cols-2 mb-12">
+        <ProtocolSettingsCard />
+        <ResourcesCard />
+      </section>
+
+      {/* ===== Closing block ===== */}
       <section className="rounded-2xl border border-amber-300/25 bg-black/50 px-6 py-6 shadow-[0_0_24px_rgba(212,175,55,0.08)] text-center">
-        <h3 className="text-lg font-semibold text-amber-300 mb-2">Reserve Outlook</h3>
-        <p className="text-white/75">
-          Staking your BGLD continuously reinforce the vault. Protocol-Owned Liquidity aligns Base Gold
-          with long-term stakers — when markets get loud, the Reserve keeps adding weight.
+        <h3 className="text-lg font-semibold text-amber-300 mb-2">
+          Reserve Outlook
+        </h3>
+        <p className="text-white/75 leading-relaxed">
+          The current focus is to complete the V1 transition responsibly and prepare a healthier
+          long-term reserve structure through V2. Updates will continue to be published here as the
+          migration path is finalized.
         </p>
       </section>
     </main>
   );
 }
 
-/* ------------ Status grid (no new endpoints) ------------ */
+/* ------------ Status grid ------------ */
 
 function StatusStats() {
   const [data, setData] = useState<{
@@ -74,11 +125,14 @@ function StatusStats() {
   useEffect(() => {
     let mounted = true;
     const ctrl = new AbortController();
+
     (async () => {
       try {
         setLoading(true);
-        // Same endpoint MetricsStrip uses
-        const res = await fetch('/api/bgld-dex', { signal: ctrl.signal, cache: 'no-store' });
+        const res = await fetch('/api/bgld-dex', {
+          signal: ctrl.signal,
+          cache: 'no-store',
+        });
         const j = await res.json();
         if (mounted && j?.ok) setData(j);
       } catch {
@@ -87,6 +141,7 @@ function StatusStats() {
         if (mounted) setLoading(false);
       }
     })();
+
     return () => {
       mounted = false;
       ctrl.abort();
@@ -99,9 +154,7 @@ function StatusStats() {
   const vol = data?.volume24h ?? 0;
   const fdv = data?.fdv ?? 0;
 
-  // Market cap from supply * price (preferred), falls back to FDV if no supply/price
-  const mc =
-    price != null && SUPPLY > 0 ? price * SUPPLY : fdv || null;
+  const mc = price != null && SUPPLY > 0 ? price * SUPPLY : fdv || null;
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -145,22 +198,38 @@ function StatCard({
   );
 }
 
-/* ------------ Static cards ------------ */
+/* ------------ Migration / status cards ------------ */
+
+function MigrationStatusCard() {
+  return (
+    <div className="rounded-2xl border border-white/12 bg-black/40 px-5 py-5">
+      <h3 className="text-lg font-semibold text-amber-300 mb-2">Migration Status</h3>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <KV label="V1 Interface Status">Paused</KV>
+        <KV label="V1 Balances">Visible Onchain</KV>
+        <KV label="Current Focus">Liquidity Review</KV>
+        <KV label="Next Phase">V2 Vault Migration</KV>
+      </div>
+      <div className="mt-3 text-sm text-white/70 leading-relaxed">
+        Existing V1 positions remain visible through the Vaults page while the protocol finalizes
+        migration mechanics, updated reserve design, and rollout details.
+      </div>
+    </div>
+  );
+}
 
 function ProtocolSettingsCard() {
   return (
     <div className="rounded-2xl border border-white/12 bg-black/40 px-5 py-5">
-      <h3 className="text-lg font-semibold text-amber-300 mb-2">Protocol Settings</h3>
+      <h3 className="text-lg font-semibold text-amber-300 mb-2">Protocol References</h3>
       <div className="grid gap-3 sm:grid-cols-2">
-        
-        <KV label="Withdraw Fee (at maturity)">2%</KV>
-        <KV label="APR Range">~10% → 600%</KV>
+        <KV label="Vault Generation">Legacy V1</KV>
+        <KV label="Target Upgrade">V2 In Progress</KV>
         <KV label="Chain">Base (8453)</KV>
+        <KV label="Market Tracking">Live</KV>
       </div>
-      <div className="mt-3 text-sm">
-        <Link href="/mechanics" className="underline text-amber-300">Full Whitepaper</Link>{' '}
-        <span className="text-white/50">·</span>{' '}
-        <Link href="/terms" className="underline text-amber-300">Terms</Link>
+      <div className="mt-3 text-sm text-white/70 leading-relaxed">
+        Status messaging reflects the current migration phase rather than active V1 participation.
       </div>
     </div>
   );
@@ -174,10 +243,56 @@ function AddressesCard({ bgld, staking }: { bgld: string; staking: string }) {
         <KV label="Token (BGLD)">
           <code className="text-amber-100 break-all">{bgld}</code>
         </KV>
-        <KV label="Staking Vault">
+        <KV label="Staking Vault (V1)">
           <code className="text-amber-100 break-all">{staking}</code>
         </KV>
       </div>
+    </div>
+  );
+}
+
+function ResourcesCard() {
+  return (
+    <div className="rounded-2xl border border-white/12 bg-black/40 px-5 py-5">
+      <h3 className="text-lg font-semibold text-amber-300 mb-2">Resources</h3>
+      <div className="space-y-2 text-sm">
+        <Link href="/positions" className="block underline text-amber-300">
+          View Existing Vaults
+        </Link>
+        <Link href="/how-it-works" className="block underline text-amber-300">
+          Mechanics / Whitepaper
+        </Link>
+        <Link href="/terms" className="block underline text-amber-300">
+          Terms
+        </Link>
+        <Link href="/" className="block underline text-amber-300">
+          Return Home
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function NoticePill({
+  title,
+  value,
+  tone,
+}: {
+  title: string;
+  value: string;
+  tone: 'amber' | 'blue' | 'emerald';
+}) {
+  const toneClass =
+    tone === 'amber'
+      ? 'border-amber-300/30 bg-amber-300/10 text-amber-200'
+      : tone === 'blue'
+      ? 'border-blue-400/30 bg-blue-400/10 text-blue-200'
+      : 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200';
+
+  return (
+    <div className={`rounded-xl border px-4 py-3 ${toneClass}`}>
+      <div className="text-[11px] uppercase tracking-wider opacity-75">{title}</div>
+      <div className="mt-1 text-sm font-semibold">{value}</div>
     </div>
   );
 }
@@ -195,8 +310,13 @@ function KV({ label, children }: { label: string; children: React.ReactNode }) {
 
 function money(n: number | null, digits = 2) {
   if (n == null || !Number.isFinite(n)) return '—';
-  return n.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: digits });
+  return n.toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: digits,
+  });
 }
+
 function pct(n?: number, digits = 2) {
   if (n == null || !Number.isFinite(n)) return '—';
   return n.toLocaleString(undefined, { maximumFractionDigits: digits });

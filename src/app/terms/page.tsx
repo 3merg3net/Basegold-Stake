@@ -1,9 +1,7 @@
-import GoldCalculator from '@/components/GoldCalculator';
-
 export const metadata = {
   title: 'Terms — Base Gold Reserve',
   description:
-    'Terms of use for the Base Gold Reserve staking vaults on Base.',
+    'Terms of use for the Base Gold Reserve protocol interface and legacy V1 vault system.',
 };
 
 export default function TermsPage() {
@@ -15,152 +13,119 @@ export default function TermsPage() {
           Terms of Use
         </h1>
         <p className="mt-3 text-white/70 max-w-2xl mx-auto">
-          These Terms govern your use of the Base Gold Reserve staking vaults. By
-          interacting with the contracts, you accept these Terms and acknowledge
-          onchain risks. Read carefully.
+          These Terms govern your use of the Base Gold Reserve interface and related protocol pages.
+          By interacting with the interface or reviewing protocol information, you acknowledge the
+          risks of blockchain systems and the transitional status of the legacy V1 vault system.
         </p>
       </section>
 
-      {/* Reserve Mechanics Summary (no compounding language) */}
+      {/* Current Status Summary */}
       <section className="mb-8">
         <div className="rounded-2xl border border-white/12 bg-black/40 px-5 py-5">
           <h2 className="text-lg font-semibold text-amber-300 mb-2">
-            Reserve Mechanics — At a Glance (V1)
+            Current Protocol Status
           </h2>
           <ul className="list-disc pl-5 space-y-2 text-white/80 text-sm leading-relaxed">
-            <li>
-              Rewards are paid in BGLD and vest continuously over your selected lock term.
-            </li>
-            <li>
-              APR scales with duration within a published range (e.g. higher APR for
-              longer locks).
-            </li>
-            <li>
-              Withdrawals at maturity incur a small protocol fee on principal plus vested
-              rewards.
-            </li>
-            <li>
-              Early exit applies a time-based penalty to principal and only pays vested
-              rewards.
-            </li>
-            <li>
-              Team-seeded protocol-owned liquidity (POL) helps reinforce liquidity depth
-              and vault longevity.
-            </li>
-            <li>
-              A simplified V2 contract with updated mechanics and dynamic APR is in
-              development; new terms will be published ahead of launch.
-            </li>
+            <li>V1 vault interactions are temporarily paused in the interface.</li>
+            <li>Existing V1 balances remain visible onchain.</li>
+            <li>The protocol is preparing a migration to a new V2 vault architecture.</li>
+            <li>Migration details and updated mechanics will be published separately.</li>
+            <li>The interface may change as the transition progresses.</li>
           </ul>
         </div>
       </section>
-
-      
 
       {/* Terms content */}
       <section className="space-y-8 leading-relaxed text-white/80">
         <div>
-          <h3 className="text-xl font-semibold text-white">1. Staking & Rewards</h3>
+          <h3 className="text-xl font-semibold text-white">1. Interface Access</h3>
           <ul className="mt-2 list-disc pl-6 space-y-2">
             <li>
-              You may lock <span className="text-white/90 font-semibold">BGLD</span> for
-              fixed terms (currently <span className="font-semibold">1–30 days</span> in
-              V1), as published in the interface.
+              The Base Gold Reserve interface is provided as an informational and interaction layer for
+              Base Gold protocol components.
             </li>
             <li>
-              Rewards are paid in <span className="text-white/90 font-semibold">BGLD</span>{' '}
-              and vest continuously over your selected term.
+              The interface may expose contract state, balances, vault references, market data, and status
+              updates, but it does not guarantee uninterrupted functionality.
             </li>
             <li>
-              Target APR scales with duration, with higher APR generally associated with
-              longer locks, subject to vault configuration and TVL.
+              During protocol transition periods, some actions may be removed, disabled, or replaced.
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 className="text-xl font-semibold text-white">2. Legacy V1 Vaults</h3>
+          <ul className="mt-2 list-disc pl-6 space-y-2">
+            <li>
+              V1 vaults are considered a legacy generation of the Base Gold Reserve system.
             </li>
             <li>
-              All rewards and balances are determined by onchain contract logic. The UI is
-              a view into that state and may occasionally lag or show approximations.
+              Existing V1 balances may remain visible through the interface and onchain while the protocol
+              completes migration planning.
+            </li>
+            <li>
+              Availability of interface actions does not alter or override underlying contract state.
+            </li>
+            <li>
+              Users are responsible for independently verifying contract addresses, balances, and transaction
+              details before taking any onchain action.
             </li>
           </ul>
         </div>
 
         <div>
           <h3 className="text-xl font-semibold text-white">
-            2. Lock Terms, Withdrawals & Early Exit
-          </h3>
-          <ul className="mt-2 list-disc pl-6 space-y-2">
-            <li>
-              <span className="font-semibold">At maturity:</span> a protocol fee (e.g. ~2%)
-              may apply to principal and vested rewards, as configured by the contract.
-            </li>
-            <li>
-              <span className="font-semibold">Early exit:</span> if you withdraw before
-              maturity, a time-based penalty is applied to principal. Only the vested
-              portion of rewards, if any, is paid out.
-            </li>
-            <li>
-              You are solely responsible for understanding how these penalties and fees
-              work before opening a vault.
-            </li>
-          </ul>
-        </div>
-
-        <div>
-          <h3 className="text-xl font-semibold text-white">
-            3. Liquidity & Sustainability
+            3. Migration & Protocol Changes
           </h3>
           <p className="mt-2">
-            The team purchased BGLD supply at launch to seed vaults and deepen
-            protocol-owned liquidity (POL) on Base. Protocol fees may recycle into the
-            vault or treasury to support system health. This structure is designed to align
-            long-term liquidity with long-term stakers, but does not guarantee any specific
-            price level or yield.
+            The Base Gold Reserve may transition from V1 to a newer V2 architecture with updated mechanics,
+            reserve design, incentives, and interface behavior. During this process, the team may revise
+            how the protocol is presented, what actions are available in the interface, and how migration
+            updates are communicated.
           </p>
         </div>
 
         <div>
-          <h3 className="text-xl font-semibold text-white">4. Protocol Upgrades (V2)</h3>
+          <h3 className="text-xl font-semibold text-white">4. No Guarantee of Interface Availability</h3>
           <p className="mt-2">
-            The Base Gold Reserve may deploy new versions of the staking contract (e.g.
-            &quot;V2&quot;) with updated mechanics, APR curves, and fee structures. When
-            this occurs, the team intends to:
+            The protocol interface may be updated, paused, restricted, redesigned, or partially disabled at
+            any time for operational, technical, legal, or migration-related reasons. Temporary interface
+            restrictions do not necessarily reflect removal of underlying onchain state.
           </p>
-          <ul className="mt-2 list-disc pl-6 space-y-2">
-            <li>Publish new documentation and parameter ranges ahead of launch.</li>
-            <li>
-              Announce any planned liquidity migration date so participants can adjust
-              positions.
-            </li>
-            <li>
-              Honor existing V1 vaults onchain according to the V1 contract logic, unless
-              otherwise stated in a publicly verifiable way.
-            </li>
-          </ul>
         </div>
 
         <div>
           <h3 className="text-xl font-semibold text-white">5. Risks</h3>
           <p className="mt-2">
-            Interacting with smart contracts involves risk, including but not limited to:
-            smart-contract bugs, market volatility, oracle or liquidity failures,
-            parameter updates, or third-party integrations. Yields are variable and not
-            guaranteed. Only stake what you can afford to lock and independently verify
-            contract addresses and parameters before interacting.
+            Interacting with blockchain systems involves risk, including but not limited to smart-contract
+            risk, market volatility, liquidity risk, interface limitations, wallet errors, chain congestion,
+            and third-party dependencies. Users should not rely solely on the interface for critical decisions
+            and should independently review onchain state where relevant.
           </p>
         </div>
 
         <div>
-          <h3 className="text-xl font-semibold text-white">6. Updates to These Terms</h3>
+          <h3 className="text-xl font-semibold text-white">6. Forward-Looking Statements</h3>
           <p className="mt-2">
-            These Terms may be amended to reflect protocol improvements, new versions of
-            the vault contract, regulatory considerations, or other changes. Updated Terms
-            may be posted on the site or in associated official channels. Continued use of
-            the protocol after updates constitutes acceptance of the revised Terms.
+            References to V2, migration, future mechanics, or ecosystem expansion are forward-looking and may
+            change as development progresses. Nothing in the interface or documentation should be interpreted
+            as a guarantee of timing, implementation, or economic outcome.
+          </p>
+        </div>
+
+        <div>
+          <h3 className="text-xl font-semibold text-white">7. Updates to These Terms</h3>
+          <p className="mt-2">
+            These Terms may be updated to reflect changes in protocol design, interface functionality,
+            migration planning, legal considerations, or other operational needs. Continued use of the
+            interface after updates constitutes acceptance of the revised Terms.
           </p>
         </div>
       </section>
 
-      {/* footer quote */}
       <div className="mt-12 text-center text-sm text-white/65 italic">
-        “Gold doesn’t rush — it endures. Base Gold brings that discipline onchain.”
+        “Transparency remains. Architecture evolves.”
       </div>
     </main>
   );
